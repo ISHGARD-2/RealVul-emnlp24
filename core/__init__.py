@@ -55,13 +55,11 @@ def main():
 
         args = parser.parse_args()
 
-        if hasattr(args, "load"):
-            if args.load == "load":
-                logging.info("[INIT] RuleCheck start.")
-                RuleCheck().load()
+        #load vulnerability rules
+        rule = args.rule
+        logging.info("[INIT] RuleCheck start.")
+        RuleCheck().load(rule)
 
-                logging.info("[INIT] RuleCheck finished.")
-                exit()
 
         if not hasattr(args, "target") or args.target == '':
             parser.print_help()

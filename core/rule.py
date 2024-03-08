@@ -190,69 +190,9 @@ class RuleCheck:
 
         return True
 
-    def check_and_update_rule_database(self, ruleconfig_content, nowrule, config, always_load_rule_from_file=False, always_keep_rule_in_database=False):
-
-        svid = nowrule.svid
-        ruleconfig_content = str(ruleconfig_content)
-        nowrule_content = str(getattr(nowrule, config)).replace(r'\"', '"')
-
-        if ruleconfig_content.lower() != str(getattr(nowrule, config)).lower():
-            logger.warning("[INIT][Rule Check] CVI_{} config {} has changed:".format(svid, config))
-            logger.warning("[INIT][Rule Check] {} in Rule File is {}".format(config, ruleconfig_content))
-            logger.warning("[INIT][Rule Check] {} in Database is {}".format(config, nowrule_content))
-
-            if always_load_rule_from_file:
-                logger.warning("[INIT][Rule Check] automatically load new {} from Rule File".format(config))
-                setattr(nowrule, config, ruleconfig_content)
-                return True
-            elif always_keep_rule_in_database:
-                return False
-            else:
-                logger.warning("[INIT][Rule Check] whether load new {} from Rule File(Y/N):".format(config))
-                if input().lower() != 'n':
-                    setattr(nowrule, config, ruleconfig_content)
-                    return True
-
-        return False
-
-    def check_rules(self, ruleclass, nowrule):
-        is_changed = False
-
-        for config in self.CONFIG_LIST:
-            if config != "main_function":
-                if config == "vulnerability":
-                    config1 = "rule_name"
-                else:
-                    config1 = config
-
-                ruleconfig_content = str(getattr(ruleclass, config)).replace(r'\"', '"')
-
-                is_changed = self.check_and_update_rule_database(ruleconfig_content, nowrule, config1) or is_changed
-
-            else:
-                main_function_content = inspect.getsource(ruleclass.main)
-                config1 = "main_function"
-
-                is_changed = self.check_and_update_rule_database(main_function_content, nowrule, config1) or is_changed
-
-        # for special match_mode
-        if ruleclass.match_mode == "regex-return-regex":
-            for config in self.SOLIDITY_CONFIG_LIST:
-                is_changed = self.check_and_update_rule_database(getattr(ruleclass, config), nowrule, config) or is_changed
-        elif ruleclass.match_mode == "only-regex":
-            for config in self.REGEX_CONFIG_LIST:
-                is_changed = self.check_and_update_rule_database(getattr(ruleclass, config), nowrule, config) or is_changed
-        elif ruleclass.match_mode == "special-crx-keyword-match":
-            for config in self.CHROME_CONFIG_LIST:
-                is_changed = self.check_and_update_rule_database(getattr(ruleclass, config), nowrule, config) or is_changed
-
-        if is_changed:
-            nowrule.save()
-        return True
-
-    def load(self):
+    def load(self, target_rule):
         """
-        load rule from file to database
+        load rule from file
         :return:
         """
 
@@ -277,68 +217,13 @@ class RuleCheck:
                     logger.info("[INIT][Load Rules] New Rule CVI_{} {}".format(ruleclass.svid, ruleclass.vulnerability))
                     self.load_rules(ruleclass)
 
-                else:
-                    logger.info("[INIT][Load Rules] Check Rule CVI_{} {}".format(ruleclass.svid, ruleclass.vulnerability))
-
-                    self.check_rules(ruleclass, r)
+                # else:
+                #     logger.info("[INIT][Load Rules] Check Rule CVI_{} {}".format(ruleclass.svid, ruleclass.vulnerability))
+                #
+                #     self.check_rules(ruleclass, r)
 
         return True
 
-    def recover(self):
-        """
-        recover rule from database to file
-        :return:
-        """
-        rules = Rules.objects.all()
-
-        for rule in rules:
-            lan = rule.language
-
-            if not os.path.isdir(os.path.join(RULES_PATH, lan)):
-                os.mkdir(os.path.join(RULES_PATH, lan))
-
-            rule_lan_path = os.path.join(RULES_PATH, lan)
-            svid = rule.svid
-
-            rule_path = os.path.join(rule_lan_path, "CVI_{}.py".format(svid))
-
-            if os.path.exists(rule_path):
-                logger.warning("[INIT][Recover] Rule file CVI_{}.py exist. whether overwrite file? (Y/N)".format(svid))
-
-                if input().lower() == 'n':
-                    continue
-
-            logger.info("[INIT][Recover] Recover new Rule file CVI_{}.py".format(svid))
-
-            template_file = codecs.open(os.path.join(RULES_PATH, 'rule.template'), 'rb+', encoding='utf-8', errors='ignore')
-            template_file_content = template_file.read()
-            template_file.close()
-
-            rule_file = codecs.open(rule_path, "wb+", encoding='utf-8', errors='ignore')
-
-            rule_name = rule.rule_name
-            svid = rule.svid
-            language = rule.language
-            author = rule.author
-            description = rule.description
-            level = rule.level
-            status = "True" if rule.status else "False"
-            match_mode = rule.match_mode
-            match = file_output_format(rule.match)
-            match_name = file_output_format(rule.match_name)
-            black_list = file_output_format(rule.black_list)
-            keyword = file_output_format(rule.keyword)
-            unmatch = file_output_format(rule.unmatch)
-            vul_function = file_output_format(rule.vul_function)
-            main_function = rule.main_function
-
-            rule_file.write(template_file_content.format(rule_name=rule_name, svid=svid, language=language,
-                                                         author=author, description=description, level=level, status=status,
-                                                         match_mode=match_mode, match=match, match_name=match_name,
-                                                         black_list=black_list, keyword=keyword, unmatch=unmatch,
-                                                         vul_function=vul_function, main_function=main_function))
-
-            rule_file.close()
 
 
 class TamperCheck:
