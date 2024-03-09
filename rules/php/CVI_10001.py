@@ -27,11 +27,11 @@ class CVI_10001():
         self.level = 4
 
         # status
-        self.status = False
+        self.status = True
 
         # 部分配置
         self.match_mode = "vustomize-match"
-        self.match = r"(echo\s?['\"]?(.+?)?\$(.+?)?['\"]?(.+?)?;)"
+        self.match = r"((echo|print)\s?.+(\n|;|(?>)))"
 
         # for solidity
         self.match_name = None

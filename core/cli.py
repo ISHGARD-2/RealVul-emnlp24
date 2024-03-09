@@ -20,12 +20,11 @@ from prettytable import PrettyTable
 
 from .detection import Detection
 from .engine import scan, Running
-from .vendors import Vendors
 
 from core.pretreatment import ast_object
 from utils.export import write_to_file
-from utils.log import logger, logger_console
-from utils.file import Directory, load_kunlunmignore
+from utils.log import logger
+from utils.file import Directory
 from utils.utils import show_context
 from utils.utils import ParseArgs
 from utils.utils import md5, random_generator
@@ -33,7 +32,7 @@ from core.vendors import get_project_by_version, get_and_save_vendor_vuls
 from Kunlun_M.settings import RULES_PATH
 from Kunlun_M.const import VUL_LEVEL, VENDOR_VUL_LEVEL
 
-from web.index.models import ScanTask, ScanResultTask, Rules, NewEvilFunc, Project, ProjectVendors, VendorVulns
+from web.index.models import ScanTask, Rules, NewEvilFunc, VendorVulns
 from web.index.models import get_resultflow_class, get_and_check_scantask_project_id, check_and_new_project_id, get_and_check_scanresult
 
 
@@ -88,7 +87,7 @@ def display_result(scan_id, is_ask=False):
 
     # check unconfirm
     if is_ask:
-        logger.warning("[INIT] whether Show Unconfirm Result?(Y/N) (Default Y)")
+        logging.warning("[INIT] whether Show Unconfirm Result?(Y/N) (Default Y)")
 
     project_id = get_and_check_scantask_project_id(scan_id)
 
@@ -101,7 +100,7 @@ def display_result(scan_id, is_ask=False):
     else:
         srs = get_and_check_scanresult(scan_id).objects.filter(scan_project_id=project_id, is_active=True,
                                                                is_unconfirm=False)
-    logger.info("[INIT] Project ID is {}".format(project_id))
+    logging.info("[INIT] Project ID is {}".format(project_id))
 
     if srs:
         logger.info("[MainThread] Scan id {} Result: ".format(scan_id))
@@ -180,7 +179,7 @@ def display_result(scan_id, is_ask=False):
         logger.info("[MainThread] Scan id {} has no Result.".format(scan_id))
 
 
-def start(target, formatter, output, special_rules, a_sid=None, language=None, tamper_name=None, black_path=None, is_unconfirm=False, is_unprecom=False):
+def start(target, special_rules, formatter='csv', output='', a_sid=None, language=None, tamper_name=None, black_path=None, is_unconfirm=False, is_unprecom=False):
     """
     Start CLI
     :param black_path: 
@@ -192,26 +191,27 @@ def start(target, formatter, output, special_rules, a_sid=None, language=None, t
     :param special_rules:
     :param a_sid: all scan id
     :return:
-    """
-    global ast_object
+    # """
+    # global ast_object
     # generate single scan id
     s_sid = get_sid(target)
-    r = Running(a_sid)
-    data = (s_sid, target)
-    r.init_list(data=target)
-    r.list(data)
-
-    report = '?sid={a_sid}'.format(a_sid=a_sid)
-    d = r.status()
-    d['report'] = report
-    r.status(d)
-
-    task_id = a_sid
-
-    # 加载 kunlunmignore
-    load_kunlunmignore()
+    # r = Running(a_sid)
+    # data = (s_sid, target)
+    # r.init_list(data=target)
+    # r.list(data)
+    #
+    # report = '?sid={a_sid}'.format(a_sid=a_sid)
+    # d = r.status()
+    # d['report'] = report
+    # r.status(d)
+    #
+    # task_id = a_sid
+    #
+    # # 加载 kunlunmignore
+    # load_kunlunmignore()
 
     # parse target mode and output mode
+
     pa = ParseArgs(target, formatter, output, special_rules, language, black_path, a_sid=None)
     target_mode = pa.target_mode
     output_mode = pa.output_mode
@@ -227,8 +227,8 @@ def start(target, formatter, output, special_rules, a_sid=None, language=None, t
         files, file_count, time_consume = Directory(target_directory, black_path_list).collect_files()
 
         # vendor check
-        project_id = get_and_check_scantask_project_id(task_id)
-        Vendors(task_id, project_id, target_directory, files)
+        # project_id = get_and_check_scantask_project_id(task_id)
+        # Vendors(task_id, project_id, target_directory, files)
 
         # detection main language and framework
 
@@ -258,7 +258,7 @@ def start(target, formatter, output, special_rules, a_sid=None, language=None, t
              files=files, tamper_name=tamper_name, is_unconfirm=is_unconfirm)
 
         # show result
-        display_result(task_id)
+        #display_result(task_id)
 
     except KeyboardInterrupt as e:
         logger.error("[!] KeyboardInterrupt, exit...")
@@ -275,140 +275,140 @@ def start(target, formatter, output, special_rules, a_sid=None, language=None, t
     write_to_file(target=target, sid=s_sid, output_format=formatter, filename=output)
 
 
-def show_info(type, key):
-    """
-    展示信息
-    """
-    def list_parse(rules_path, istamp=False):
-
-        files = os.listdir(rules_path)
-        result = []
-
-        for f in files:
-
-            if f.startswith("_") or f.endswith("pyc"):
-                continue
-
-            if os.path.isdir(os.path.join(rules_path, f)):
-                if f not in ['test', 'tamper']:
-                    result.append(f)
-
-            if f.startswith("CVI_"):
-                result.append(f)
-
-            if istamp:
-                if f not in ['test.py', 'demo.py', 'none.py']:
-                    result.append(f)
-
-        return result
-
-    info_dict = {}
-
-    if type == "rule":
-
-        rule_lan_list = list_parse(RULES_PATH)
-        rule_dict = {}
-        if key == "all":
-            # show all
-            for lan in rule_lan_list:
-                info_dict[lan] = []
-                rule_lan_path = os.path.join(RULES_PATH, lan)
-
-                info_dict[lan] = list_parse(rule_lan_path)
-
-        elif key in rule_lan_list:
-            info_dict[key] = []
-            rule_lan_path = os.path.join(RULES_PATH, key)
-
-            info_dict[key] = list_parse(rule_lan_path)
-
-        elif str(int(key)) == key:
-            for lan in rule_lan_list:
-                info_dict[lan] = []
-                rule_lan_path = os.path.join(RULES_PATH, lan)
-
-                info_dict[lan] = list_parse(rule_lan_path)
-
-            for lan in info_dict:
-                if "CVI_{}.py".format(key) in info_dict[lan]:
-                    f = codecs.open(os.path.join(RULES_PATH, lan, "CVI_{}.py".format(key)), encoding='utf-8', errors="ignore")
-                    return f.read()
-
-            logger.error('[Show] no CVI id {}.'.format(key))
-            return ""
-        else:
-            logger.error('[Show] error language/CVI id input.')
-            return ""
-
-        i = 0
-        table = PrettyTable(
-            ['#', 'CVI', 'Lang/CVE-id', 'Rule(ID/Name)', 'Match', 'Status'])
-
-        table.align = 'l'
-
-        for lan in info_dict:
-            for rule in info_dict[lan]:
-                i += 1
-                rulename = rule.split('.')[0]
-                rulefile = "rules." + lan + "." + rulename
-
-                rule_obj = __import__(rulefile, fromlist=rulename)
-                p = getattr(rule_obj, rulename)
-
-                ruleclass = p()
-
-                table.add_row([i, ruleclass.svid, ruleclass.language, ruleclass.vulnerability, ruleclass.match, ruleclass.status])
-
-        return table
-
-    elif type == "tamper":
-
-        table = PrettyTable(
-            ['#', 'TampName', 'FilterFunc', 'InputControl'])
-
-        table.align = 'l'
-        i = 0
-
-        tamp_path = os.path.join(RULES_PATH, 'tamper/')
-        tamp_list = list_parse(tamp_path, True)
-
-        if key == "all":
-            for tamp in tamp_list:
-                i += 1
-                tampname = tamp.split('.')[0]
-                tampfile = "rules.tamper." + tampname
-
-                tamp_obj = __import__(tampfile, fromlist=tampname)
-
-                filter_func = getattr(tamp_obj, tampname)
-                input_control = getattr(tamp_obj, tampname + "_controlled")
-
-                table.add_row([i, tampname, filter_func, input_control])
-
-            return table
-        elif key + ".py" in tamp_list:
-            tampname = key
-            tampfile = "rules.tamper." + tampname
-
-            tamp_obj = __import__(tampfile, fromlist=tampname)
-
-            filter_func = getattr(tamp_obj, tampname)
-            input_control = getattr(tamp_obj, tampname + "_controlled")
-
-            return """
-Tamper Name:
-    {}
-
-Filter Func:
-{}
-    
-Input Control:
-{}
-""".format(tampname, pprint.pformat(filter_func, indent=4), pprint.pformat(input_control, indent=4))
-        else:
-            logger.error("[Info] no tamper name {]".format(key))
-
-    return ""
+# def show_info(type, key):
+#     """
+#     展示信息
+#     """
+#     def list_parse(rules_path, istamp=False):
+#
+#         files = os.listdir(rules_path)
+#         result = []
+#
+#         for f in files:
+#
+#             if f.startswith("_") or f.endswith("pyc"):
+#                 continue
+#
+#             if os.path.isdir(os.path.join(rules_path, f)):
+#                 if f not in ['test', 'tamper']:
+#                     result.append(f)
+#
+#             if f.startswith("CVI_"):
+#                 result.append(f)
+#
+#             if istamp:
+#                 if f not in ['test.py', 'demo.py', 'none.py']:
+#                     result.append(f)
+#
+#         return result
+#
+#     info_dict = {}
+#
+#     if type == "rule":
+#
+#         rule_lan_list = list_parse(RULES_PATH)
+#         rule_dict = {}
+#         if key == "all":
+#             # show all
+#             for lan in rule_lan_list:
+#                 info_dict[lan] = []
+#                 rule_lan_path = os.path.join(RULES_PATH, lan)
+#
+#                 info_dict[lan] = list_parse(rule_lan_path)
+#
+#         elif key in rule_lan_list:
+#             info_dict[key] = []
+#             rule_lan_path = os.path.join(RULES_PATH, key)
+#
+#             info_dict[key] = list_parse(rule_lan_path)
+#
+#         elif str(int(key)) == key:
+#             for lan in rule_lan_list:
+#                 info_dict[lan] = []
+#                 rule_lan_path = os.path.join(RULES_PATH, lan)
+#
+#                 info_dict[lan] = list_parse(rule_lan_path)
+#
+#             for lan in info_dict:
+#                 if "CVI_{}.py".format(key) in info_dict[lan]:
+#                     f = codecs.open(os.path.join(RULES_PATH, lan, "CVI_{}.py".format(key)), encoding='utf-8', errors="ignore")
+#                     return f.read()
+#
+#             logger.error('[Show] no CVI id {}.'.format(key))
+#             return ""
+#         else:
+#             logger.error('[Show] error language/CVI id input.')
+#             return ""
+#
+#         i = 0
+#         table = PrettyTable(
+#             ['#', 'CVI', 'Lang/CVE-id', 'Rule(ID/Name)', 'Match', 'Status'])
+#
+#         table.align = 'l'
+#
+#         for lan in info_dict:
+#             for rule in info_dict[lan]:
+#                 i += 1
+#                 rulename = rule.split('.')[0]
+#                 rulefile = "rules." + lan + "." + rulename
+#
+#                 rule_obj = __import__(rulefile, fromlist=rulename)
+#                 p = getattr(rule_obj, rulename)
+#
+#                 ruleclass = p()
+#
+#                 table.add_row([i, ruleclass.svid, ruleclass.language, ruleclass.vulnerability, ruleclass.match, ruleclass.status])
+#
+#         return table
+#
+#     elif type == "tamper":
+#
+#         table = PrettyTable(
+#             ['#', 'TampName', 'FilterFunc', 'InputControl'])
+#
+#         table.align = 'l'
+#         i = 0
+#
+#         tamp_path = os.path.join(RULES_PATH, 'tamper/')
+#         tamp_list = list_parse(tamp_path, True)
+#
+#         if key == "all":
+#             for tamp in tamp_list:
+#                 i += 1
+#                 tampname = tamp.split('.')[0]
+#                 tampfile = "rules.tamper." + tampname
+#
+#                 tamp_obj = __import__(tampfile, fromlist=tampname)
+#
+#                 filter_func = getattr(tamp_obj, tampname)
+#                 input_control = getattr(tamp_obj, tampname + "_controlled")
+#
+#                 table.add_row([i, tampname, filter_func, input_control])
+#
+#             return table
+#         elif key + ".py" in tamp_list:
+#             tampname = key
+#             tampfile = "rules.tamper." + tampname
+#
+#             tamp_obj = __import__(tampfile, fromlist=tampname)
+#
+#             filter_func = getattr(tamp_obj, tampname)
+#             input_control = getattr(tamp_obj, tampname + "_controlled")
+#
+#             return """
+# Tamper Name:
+#     {}
+#
+# Filter Func:
+# {}
+#
+# Input Control:
+# {}
+# """.format(tampname, pprint.pformat(filter_func, indent=4), pprint.pformat(input_control, indent=4))
+#         else:
+#             logger.error("[Info] no tamper name {]".format(key))
+#
+#     return ""
 
 
 def search_project(search_type, keyword, keyword_value, with_vuls=False):

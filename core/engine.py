@@ -14,11 +14,9 @@
 import json
 import os
 import re
-import shutil
 import asyncio
 import traceback
 import portalocker
-from prettytable import PrettyTable
 
 from core.core_engine.php.parser import scan_parser as php_scan_parser
 from core.core_engine.php.engine import init_match_rule as php_init_match_rule
@@ -33,14 +31,13 @@ from Kunlun_M import const
 from Kunlun_M.settings import RUNNING_PATH
 from Kunlun_M.const import ext_dict
 from Kunlun_M.const import VulnerabilityResult
-from Kunlun_M.const import match_modes
 
 from utils.utils import show_context
 from utils.file import FileParseAll, get_line
 from utils.log import logger
 from utils.status import get_scan_id
 
-from web.index.models import ScanResultTask, NewEvilFunc
+from web.index.models import NewEvilFunc
 from web.index.models import get_resultflow_class, check_update_or_new_scanresult
 
 
@@ -164,8 +161,8 @@ def scan_single(target_directory, single_rule, files=None, language=None, tamper
 def scan(target_directory, a_sid=None, s_sid=None, special_rules=None, language=None, framework=None, file_count=0,
          extension_count=0, files=None, tamper_name=None, is_unconfirm=False):
     r = Rule(language)
-    vulnerabilities = r.vulnerabilities
     rules = r.rules(special_rules)
+
     find_vulnerabilities = []
     newcore_function_list = {}
 
@@ -249,7 +246,6 @@ def scan(target_directory, a_sid=None, s_sid=None, special_rules=None, language=
         # sr.save()
 
         # 如果返回false，那么说明漏洞存在，不添加新的
-
         if sr:
             for chain in x.chain:
                 if type(chain) == tuple:
@@ -435,10 +431,6 @@ class SingleRule(object):
                 if self.sr.keyword == 'is_echo_statement':
                     match = const.fpc_echo_statement_single.replace('[f]', self.sr.match)
 
-            # 垃圾js毁一生，动态类型一时爽，静态分析火葬厂
-            if self.sr.language.lower() == "javascript":
-                match = const.fpc_loose.replace('[f]', self.sr.match)
-
             try:
                 if match:
                     f = FileParseAll(self.files, self.target_directory, language=self.lan)
@@ -544,6 +536,7 @@ class SingleRule(object):
                 logger.debug('Not vulnerability, continue...')
                 continue
             is_test = False
+
             try:
                 datas = Core(self.target_directory, vulnerability, self.sr, 'project name',
                              ['whitelist1', 'whitelist2'], test=is_test, index=index,
@@ -686,49 +679,6 @@ class Core(object):
             line=self.line_number,
             code=self.code_content))
 
-    def is_white_list(self):
-        """
-        Is white-list file
-        :return: boolean
-        """        
-        target_directory = self.target_directory.replace('\\','/')
-        file_path = self.file_path.replace('\\','/')
-        return file_path.split(target_directory, 1)[-1] in self.white_list
-
-
-    def is_special_file(self):
-        """
-        Is special file
-        :method: According to the file name to determine whether the special file
-        :return: boolean
-        """
-        special_paths = [
-            '/node_modules/',
-            '/bower_components/',
-            '.min.js',
-            'jquery',
-        ]
-        for path in special_paths:
-            if path in self.file_path:
-                return True
-        return False
-
-    def is_test_file(self):
-        """
-        Is test case file
-        :method: file name
-        :return: boolean
-        """
-        test_paths = [
-            '/test/',
-            '/tests/',
-            '/unitTests/'
-        ]
-        for path in test_paths:
-            if path in self.file_path:
-                return True
-        return False
-
     def is_match_only_rule(self):
         """
         Whether only match the rules, do not parameter controllable processing
@@ -834,16 +784,6 @@ class Core(object):
             self.code_content = self.code_content[:500]
         self.status = self.status_init
         self.repair_code = self.repair_code_init
-        if self.is_white_list():
-            logger.debug("[RET] Whitelist")
-            return False, 'Whitelists(白名单)'
-
-        if self.is_special_file():
-            logger.debug("[RET] Special File")
-            return False, 'Special File(特殊文件)'
-
-        if self.is_test_file():
-            logger.debug("[CORE] Test File")
 
         if self.is_annotation():
             logger.debug("[RET] Annotation")
@@ -950,148 +890,6 @@ class Core(object):
 
                     logger.debug('[CVI-{cvi}] [PARAM-CONTROLLABLE] Param Not Controllable'.format(cvi=self.cvi))
                     return False, 'Param-Not-Controllable'
-            except Exception as e:
-                logger.debug(traceback.format_exc())
-                return False, 'Exception'
-
-        # elif self.file_path[-3:].lower() == 'sol':
-        elif self.lan == "solidity":
-            try:
-                ast = CAST(self.rule_match, self.target_directory, self.file_path, self.line_number,
-                           self.code_content, files=self.files, rule_class=self.single_rule,
-                           repair_functions=self.repair_functions)
-
-                # only match
-                if self.rule_match_mode == const.mm_regex_only_match:
-                    #
-                    # Regex-Only-Match
-                    # Match(regex) -> Repair -> Done
-                    #
-                    logger.debug("[CVI-{cvi}] [ONLY-MATCH]".format(cvi=self.cvi))
-                    return True, 'Regex-only-match'
-                elif self.rule_match_mode == const.mm_regex_return_regex:
-                    logger.debug("[CVI-{cvi}] [REGEX-RETURN-REGEX]".format(cvi=self.cvi))
-                    return True, 'Regex-return-regex'
-                else:
-                    logger.warn(
-                        "[CVI-{cvi} [OTHER-MATCH]] sol rules only support for Regex-only-match and Regex-return-regex...".format(
-                            cvi=self.cvi))
-                    return False, 'Unsupport Match'
-
-            except Exception as e:
-                logger.debug(traceback.format_exc())
-                return False, 'Exception'
-
-        # elif self.file_path[-3:].lower() == '.js':
-        elif self.lan == "javascript":
-            try:
-                ast = CAST(self.rule_match, self.target_directory, self.file_path, self.line_number,
-                           self.code_content, files=self.files, rule_class=self.single_rule,
-                           repair_functions=self.repair_functions)
-
-                # only match
-                if self.rule_match_mode == const.mm_regex_only_match:
-                    #
-                    # Regex-Only-Match
-                    # Match(regex) -> Repair -> Done
-                    #
-                    logger.debug("[CVI-{cvi}] [ONLY-MATCH]".format(cvi=self.cvi))
-                    return True, 'Regex-only-match'
-                elif self.rule_match_mode == const.mm_regex_return_regex:
-                    logger.debug("[CVI-{cvi}] [REGEX-RETURN-REGEX]".format(cvi=self.cvi))
-                    return True, 'Regex-return-regex'
-
-                    # Match for function-param-regex
-                elif self.rule_match_mode == const.mm_function_param_controllable:
-                    rule_match = self.rule_match.strip('()').split('|')
-                    logger.debug('[RULE_MATCH] {r}'.format(r=rule_match))
-                    try:
-                        result = js_scan_parser(rule_match, self.line_number, self.file_path,
-                                                repair_functions=self.repair_functions,
-                                                controlled_params=self.controlled_list)
-                        logger.debug('[AST] [RET] {c}'.format(c=result))
-                        if len(result) > 0:
-                            if result[0]['code'] == 1:  # 函数参数可控
-                                return True, 'Function-param-controllable', result[0]['chain']
-
-                            elif result[0]['code'] == 2:  # 漏洞修复
-                                return False, 'Function-param-controllable but fixed', result[0]['chain']
-
-                            elif result[0]['code'] == 3:  # 疑似漏洞
-                                if self.is_unconfirm:
-                                    return True, 'Unconfirmed Function-param-controllable', result[0]['chain']
-                                else:
-                                    return False, 'Unconfirmed Function-param-controllable', result[0]['chain']
-
-                            elif result[0]['code'] == -1:  # 函数参数不可控
-                                return False, 'Function-param-uncon', result[0]['chain']
-
-                            elif result[0]['code'] == 4:  # 新规则生成
-                                return False, 'New Core', result[0]['source']
-
-                            logger.debug('[AST] [CODE] {code}'.format(code=result[0]['code']))
-                        else:
-                            logger.debug(
-                                '[AST] Parser failed / vulnerability parameter is not controllable {r}'.format(
-                                    r=result))
-                            return False, 'Can\'t parser'
-                    except Exception:
-                        exc_msg = traceback.format_exc()
-                        logger.warning(exc_msg)
-                        raise
-
-                elif self.rule_match_mode == const.mm_regex_param_controllable:
-                    param_is_controllable, code, data, chain = ast.is_controllable_param()
-                    if param_is_controllable:
-                        logger.debug('[CVI-{cvi}] [PARAM-CONTROLLABLE] Param is controllable'.format(cvi=self.cvi))
-
-                        if code == 1:
-                            return True, 'Vustomize-Match', chain
-                        elif code == 3:
-                            if self.is_unconfirm:
-                                return True, 'Unconfirmed Vustomize-Match', chain
-                            else:
-                                return False, 'Unconfirmed Vustomize-Match', chain
-                    else:
-                        if type(data) is tuple:
-                            if int(data[0]) == 4:
-                                return False, 'New Core', data[1]
-
-                        logger.debug('[CVI-{cvi}] [PARAM-CONTROLLABLE] Param Not Controllable'.format(cvi=self.cvi))
-                        return False, 'Param-Not-Controllable'
-
-                else:
-                    logger.warn("[CVI-{cvi} [OTHER-MATCH]] javascript not support this rules...".format(cvi=self.cvi))
-                    return False, 'Unsupport Match'
-
-            except Exception as e:
-                logger.debug(traceback.format_exc())
-                return False, 'Exception'
-
-        elif self.lan == "chromeext":
-            try:
-                ast = CAST(self.rule_match, self.target_directory, self.file_path, self.line_number,
-                           self.code_content, files=self.files, rule_class=self.single_rule,
-                           repair_functions=self.repair_functions)
-
-                # only match
-                if self.rule_match_mode == const.mm_regex_only_match:
-                    #
-                    # Regex-Only-Match
-                    # Match(regex) -> Repair -> Done
-                    #
-                    logger.debug("[CVI-{cvi}] [ONLY-MATCH]".format(cvi=self.cvi))
-                    return True, 'Regex-only-match'
-                elif self.rule_match_mode == const.mm_regex_return_regex:
-                    logger.debug("[CVI-{cvi}] [REGEX-RETURN-REGEX]".format(cvi=self.cvi))
-                    return True, 'Regex-return-regex'
-                elif self.rule_match_mode == const.sp_crx_keyword_match:
-                    logger.debug("[CVI-{cvi}] [SPECIAL-CRX-KEYWORD-MATCH]".format(cvi=self.cvi))
-                    return True, 'Specail-crx-keyword-match'
-                else:
-                    logger.warn("[CVI-{cvi} [OTHER-MATCH]] chrome ext rules not support it...".format(cvi=self.cvi))
-                    return False, 'Unsupport Match'
-
             except Exception as e:
                 logger.debug(traceback.format_exc())
                 return False, 'Exception'

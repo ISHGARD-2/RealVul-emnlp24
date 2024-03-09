@@ -1316,23 +1316,23 @@ Input Control:
         else:
             return
 
-    def command_search(self, *args, **kwargs):
-
-        param = self.clear_args(args[0])
-
-        if len(param) < 3:
-            logger.error("[Console] Command Search need to set 'mod' 'keyword' 'keyvalue'.e.g.: search vendor flask 0.10.1")
-
-        mod = param[0]
-        keyword = param[1]
-        keyvalue = param[2]
-
-        if mod not in ['vendor']:
-            logger.error("[Console] Command Config need to set mod in ['vendor'].")
-            return
-
-        if mod == 'vendor':
-            cli.search_project(mod, keyword, keyvalue, with_vuls=True)
+    # def command_search(self, *args, **kwargs):
+    #
+    #     param = self.clear_args(args[0])
+    #
+    #     if len(param) < 3:
+    #         logger.error("[Console] Command Search need to set 'mod' 'keyword' 'keyvalue'.e.g.: search vendor flask 0.10.1")
+    #
+    #     mod = param[0]
+    #     keyword = param[1]
+    #     keyvalue = param[2]
+    #
+    #     if mod not in ['vendor']:
+    #         logger.error("[Console] Command Config need to set mod in ['vendor'].")
+    #         return
+    #
+    #     if mod == 'vendor':
+    #         cli.search_project(mod, keyword, keyvalue, with_vuls=True)
 
     def command_config(self, *args, **kwargs):
 

@@ -31,7 +31,7 @@ class CVI_1000():
 
         # 部分配置
         self.match_mode = "function-param-regex"
-        self.match = r"print|print_r|exit|die|printf|vprintf|trigger_error|user_error|odbc_result_all|ovrimos_result_all|ifx_htmltbl_result"
+        self.match = r"echo|print|print_r|exit|die|printf|vprintf|trigger_error|user_error|odbc_result_all|ovrimos_result_all|ifx_htmltbl_result"
 
         # for solidity
         self.match_name = None

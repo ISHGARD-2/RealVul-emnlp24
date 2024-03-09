@@ -4,7 +4,9 @@ class a{
         while(1==1){
             if(1==1){
                 function b(){
-                    print(system(trim('ls'.$_GET['test'])));
+                    $taint = $_GET['test'];
+                     //print($taint);
+                    echo system(trim('ls'.$taint));
                 }
              }
         }

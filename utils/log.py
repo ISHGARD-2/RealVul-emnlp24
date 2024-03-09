@@ -20,8 +20,8 @@ from Kunlun_M.settings import LOGS_PATH
 #
 # Copyright (C) 2010-2012 Vinay Sajip. All rights reserved. Licensed under the new BSD license.
 #
-logger = logging.getLogger('KunlunLog')
-logger_console = logging.getLogger('KunlunConsoleLog')
+logger = logging.getLogger('ISHGARD')
+logger_console = logging.getLogger('ISHGARDConsoleLog')
 log_path = LOGS_PATH
 
 

@@ -14,6 +14,7 @@
 import os
 import inspect
 import codecs
+import logging
 from Kunlun_M.settings import RULES_PATH
 
 from utils.log import logger
@@ -52,7 +53,7 @@ def block(index):
 
 class Rule(object):
     def __init__(self, lans=[]):
-        origin_lans = ["base"]
+        origin_lans = []
         origin_lans.extend(lans)
 
         self.rule_dict = {}
@@ -79,6 +80,7 @@ class Rule(object):
         rules = {}
 
         if special_rules is None:
+            logging.error("[+++rule+++] no special rule")
             return self.rule_dict
         else:
             for rulename in self.rule_dict:
