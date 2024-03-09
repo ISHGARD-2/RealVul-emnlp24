@@ -807,6 +807,8 @@ class Core(object):
         if self.lan == "php":
             try:
                 self.init_php_repair()
+
+                # organize information about vulnerability
                 ast = CAST(self.rule_match, self.target_directory, self.file_path, self.line_number,
                            self.code_content, files=self.files, rule_class=self.single_rule,
                            repair_functions=self.repair_functions, controlled_params=self.controlled_list)

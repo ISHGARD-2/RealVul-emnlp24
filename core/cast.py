@@ -206,10 +206,9 @@ class CAST(object):
         is controllable param
         :return:
         """
-        param_name = re.findall(self.rule, self.code)
-
+        params = None
         if self.sr is not None:
-            params = self.sr.main(param_name)
+            params = self.sr.main(self.code)
 
         if params is None:
             logger.debug("[AST] Not matching variables...")

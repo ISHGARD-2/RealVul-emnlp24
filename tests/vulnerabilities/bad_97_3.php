@@ -20,14 +20,14 @@ require_once("../globals.php");
 require_once("$srcdir/patient.inc");
 require_once("../../custom/code_types.inc.php");
 //test1111111
-$info_msg = "";
+$info_msg = ;
 $codetype = $_REQUEST['codetype'];
 $form_code_type = $_POST['form_code_type'];
+print($info_msg);
 ?>
 <html>
 <head>
 <?php html_header_show(); ?>
 <title><?php xl('Code Finder', 'e'); ?></title>
-<link rel="stylesheet" href='<?php echo $css_header
-?>' type='text/css'>
+<link rel="stylesheet" href='<?php echo $css_header?>' type='text/css'>
 </html>
