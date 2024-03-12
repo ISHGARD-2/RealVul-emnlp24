@@ -1603,12 +1603,7 @@ def anlysis_params(param, file_path, vul_lineno, vul_function=None, repair_funct
     code = "find param {}".format(param)
     scan_chain.append(('NewFind', code, file_path, vul_lineno))
 
-    vul_nodes = []
-    for node in all_nodes:
-        if node is not None and node.lineno <= int(vul_lineno):
-            vul_nodes.append(node)
-
-    is_co, cp, expr_lineno = deep_parameters_back(param, vul_nodes, function_params, count, file_path, vul_lineno,
+    is_co, cp, expr_lineno = deep_parameters_back(param, all_nodes, function_params, count, file_path, vul_lineno,
                                                   vul_function=vul_function)
 
     return is_co, cp, expr_lineno, scan_chain

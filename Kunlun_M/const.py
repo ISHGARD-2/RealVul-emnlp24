@@ -60,16 +60,10 @@ fav = '\$([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)'
 
 ext_dict = {
     "php": ['.php', '.php3', '.php4', '.php5', '.php7', '.pht', '.phs', '.phtml', '.inc'],
-    "solidity": ['.sol'],
-    "javascript": ['.js'],
-    "chromeext": ['.crx'],
-    "html": ['.html'],
-    "base": ['*']
 }
 
 ext_comment_dict = {
-    "php": ['//', '/*'],
-    "javascript": ['//', '/*'],
+    "php": ['//', '/*']
 }
 
 default_black_list = ['.crx_files', 'vendor']
@@ -78,19 +72,7 @@ IGNORE_LIST = []
 VUL_LEVEL = ['low', 'low', 'low', 'low', 'medium', 'medium', 'medium', 'medium', 'high', 'high', 'critical']
 
 VENDOR_FILE_DICT = {
-    "java": ['pom.xml', 'build.gradle'],
-    'golang': ['go.mod'],
-    'python': ['requirements.txt'],
-    'php': ['composer.json'],
-    'nodejs': ['package.json'],
-}
-
-VENDOR_ECOSYSTEM = {
-    "java":    {"depsdev": "maven", "murphysec": "java"},
-    'golang': {"depsdev": "go", "murphysec": "golang"},
-    'python': {"ossindex": "pypi", "murphysec": "python"},
-    'php': {"ossindex": "composer", "murphysec": "php"},
-    'nodejs': {"depsdev": "npm", "murphysec": "js"},
+    'php': ['composer.json']
 }
 
 VENDOR_VUL_LEVEL = ['None', 'low', 'low', 'low', 'medium', 'medium', 'medium', 'medium', 'high', 'high', 'high']

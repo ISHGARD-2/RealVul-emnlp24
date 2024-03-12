@@ -18,6 +18,8 @@ import jsbeautifier
 from utils.log import logger
 from Kunlun_M.const import ext_dict
 from utils.file import un_zip
+from utils.file import Directory
+from utils.utils import ParseArgs, get_sid
 
 import gc
 import os
@@ -459,3 +461,30 @@ class Pretreatment:
 
 
 ast_object = Pretreatment()
+
+
+def ast_gen(target_path, formatter, output, special_rules):
+    global pa, test
+    s_sid = get_sid(target_path)
+
+    # parse target mode
+    pa = ParseArgs(target_path, formatter, output, special_rules)
+    target_mode = pa.target_mode
+
+    # target directory
+    logger.info('[CLI] Target Mode: {}'.format(target_mode))
+    target_directory = pa.target_directory(target_mode)
+    logger.info('[CLI] Target : {d}'.format(d=target_directory))
+
+    # static analyse files info
+    files, file_count, time_consume = Directory(target_directory).collect_files()
+
+    main_language = pa.language
+    logger.info(
+        '[CLI] [STATISTIC] Language: {l}'.format(l=",".join(main_language)))
+    logger.info('[CLI] [STATISTIC] Files: {fc}, Extensions:{ec}, Consume: {tc}'.format(fc=file_count, ec=len(files),
+                                                                                       tc=time_consume))
+
+    # Pretreatment ast object
+    ast_object.init_pre(target_directory, files)
+    ast_object.pre_ast_all(main_language, is_unprecom=False)

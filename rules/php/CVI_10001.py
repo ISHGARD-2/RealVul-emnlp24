@@ -53,8 +53,8 @@ class CVI_10001():
         """
         sql_sen = regex_string[0][0]
         reg = "\$\w+"
-        if re.search(reg, sql_sen, re.I):
+        if re.search(reg, regex_string, re.I):
             p = re.compile(reg)
-            match = p.findall(sql_sen)
+            match = p.findall(regex_string)
             return match
         return None

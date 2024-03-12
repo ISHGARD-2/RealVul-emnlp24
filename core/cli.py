@@ -12,9 +12,6 @@
     :copyright: Copyright (c) 2017 Feei. All rights reserved
 """
 
-import os
-import codecs
-import pprint
 import traceback
 from prettytable import PrettyTable
 
@@ -26,27 +23,13 @@ from utils.export import write_to_file
 from utils.log import logger
 from utils.file import Directory
 from utils.utils import show_context
-from utils.utils import ParseArgs
+from utils.utils import ParseArgs, get_sid
 from utils.utils import md5, random_generator
 from core.vendors import get_project_by_version, get_and_save_vendor_vuls
-from Kunlun_M.settings import RULES_PATH
 from Kunlun_M.const import VUL_LEVEL, VENDOR_VUL_LEVEL
 
 from web.index.models import ScanTask, Rules, NewEvilFunc, VendorVulns
 from web.index.models import get_resultflow_class, get_and_check_scantask_project_id, check_and_new_project_id, get_and_check_scanresult
-
-
-def get_sid(target, is_a_sid=False):
-    target = target
-    if isinstance(target, list):
-        target = ';'.join(target)
-    sid = md5(target)[:5]
-    if is_a_sid:
-        pre = 'a'
-    else:
-        pre = 's'
-    sid = '{p}{sid}{r}'.format(p=pre, sid=sid, r=random_generator())
-    return sid.lower()
 
 
 def check_scantask(task_name, target_path, parameter_config, project_origin, project_des="", auto_yes=False):
@@ -87,7 +70,7 @@ def display_result(scan_id, is_ask=False):
 
     # check unconfirm
     if is_ask:
-        logging.warning("[INIT] whether Show Unconfirm Result?(Y/N) (Default Y)")
+        logger.warning("[INIT] whether Show Unconfirm Result?(Y/N) (Default Y)")
 
     project_id = get_and_check_scantask_project_id(scan_id)
 
@@ -100,7 +83,7 @@ def display_result(scan_id, is_ask=False):
     else:
         srs = get_and_check_scanresult(scan_id).objects.filter(scan_project_id=project_id, is_active=True,
                                                                is_unconfirm=False)
-    logging.info("[INIT] Project ID is {}".format(project_id))
+    logger.info("[INIT] Project ID is {}".format(project_id))
 
     if srs:
         logger.info("[MainThread] Scan id {} Result: ".format(scan_id))
@@ -179,7 +162,7 @@ def display_result(scan_id, is_ask=False):
         logger.info("[MainThread] Scan id {} has no Result.".format(scan_id))
 
 
-def start(target, special_rules, formatter='csv', output='', a_sid=None, language=None, tamper_name=None, black_path=None, is_unconfirm=False, is_unprecom=False):
+def start(target, special_rules, formatter='csv', output='', a_sid=None, tamper_name=None, is_unconfirm=False, is_unprecom=False):
     """
     Start CLI
     :param black_path: 
@@ -192,27 +175,7 @@ def start(target, special_rules, formatter='csv', output='', a_sid=None, languag
     :param a_sid: all scan id
     :return:
     # """
-    # global ast_object
-    # generate single scan id
-    s_sid = get_sid(target)
-    # r = Running(a_sid)
-    # data = (s_sid, target)
-    # r.init_list(data=target)
-    # r.list(data)
-    #
-    # report = '?sid={a_sid}'.format(a_sid=a_sid)
-    # d = r.status()
-    # d['report'] = report
-    # r.status(d)
-    #
-    # task_id = a_sid
-    #
-    # # 加载 kunlunmignore
-    # load_kunlunmignore()
-
-    # parse target mode and output mode
-
-    pa = ParseArgs(target, formatter, output, special_rules, language, black_path, a_sid=None)
+    global pa
     target_mode = pa.target_mode
     output_mode = pa.output_mode
     black_path_list = pa.black_path_list
@@ -226,19 +189,9 @@ def start(target, special_rules, formatter='csv', output='', a_sid=None, languag
         # static analyse files info
         files, file_count, time_consume = Directory(target_directory, black_path_list).collect_files()
 
-        # vendor check
-        # project_id = get_and_check_scantask_project_id(task_id)
-        # Vendors(task_id, project_id, target_directory, files)
-
         # detection main language and framework
-
-        if not language:
-            dt = Detection(target_directory, files)
-            main_language = dt.language
-            main_framework = dt.framework
-        else:
-            main_language = pa.language
-            main_framework = pa.language
+        main_language = pa.language
+        main_framework = pa.language
 
         logger.info('[CLI] [STATISTIC] Language: {l} Framework: {f}'.format(l=",".join(main_language), f=main_framework))
         logger.info('[CLI] [STATISTIC] Files: {fc}, Extensions:{ec}, Consume: {tc}'.format(fc=file_count,

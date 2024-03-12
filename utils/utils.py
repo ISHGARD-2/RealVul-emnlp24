@@ -39,10 +39,14 @@ PY2 = sys.version_info[0] == 2
 
 
 class ParseArgs(object):
-    def __init__(self, target, formatter, output, special_rules=None, language=None, black_path=None, a_sid=None):
+    def __init__(self, target, formatter, output, special_rules=None, a_sid=None):
         self.target = target
         self.formatter = formatter
         self.output = output if output else ""
+        self.language = ['php']
+        logger.info("[INIT][PARSE_ARGS] Only one Language {}.".format(self.language))
+        self.sid = a_sid
+        self.black_path_list = []
 
         if special_rules != None and special_rules != '':
             self.special_rules = []
@@ -73,32 +77,6 @@ class ParseArgs(object):
         else:
             self.special_rules = None
 
-        # check black pth list
-        if black_path != None and black_path != "":
-            self.black_path_list = []
-
-            if ',' in black_path:
-                self.black_path_list = [x.strip() for x in black_path.split(',') if x != ""]
-                logger.info("[INIT][PARSE_ARGS] Black Path list is {}".format(self.black_path_list))
-            else:
-                self.black_path_list = []
-                logger.warning("[INIT][PARSE_ARGS] Black Path parse error.")
-
-        else:
-            self.black_path_list = []
-
-        # check and deal language
-        if language != None and language != "":
-            self.language = []
-
-            if ',' in language:
-                self.language = [x.strip() for x in language.split(',') if x != ""]
-                logger.info("[INIT][PARSE_ARGS] Language is {}".format(self.language))
-            else:
-                self.language = [language.strip()]
-                logger.info("[INIT][PARSE_ARGS] Only one Language {}.".format(self.language))
-
-        self.sid = a_sid
 
     @staticmethod
     def _check_rule_name(name):
@@ -812,3 +790,15 @@ def compare_vendor(vendor_version, compare_version):
         is_smaller_vendor = True
 
     return is_smaller_vendor
+
+def get_sid(target, is_a_sid=False):
+    target = target
+    if isinstance(target, list):
+        target = ';'.join(target)
+    sid = md5(target)[:5]
+    if is_a_sid:
+        pre = 'a'
+    else:
+        pre = 's'
+    sid = '{p}{sid}{r}'.format(p=pre, sid=sid, r=random_generator())
+    return sid.lower()

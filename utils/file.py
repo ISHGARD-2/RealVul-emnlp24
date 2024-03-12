@@ -266,7 +266,8 @@ class FileParseAll:
 
                         lastchar = ''
                         backstr += '\n'
-                        continue
+                    continue
+
 
                 if char == '\n':
                     backstr += '\n'
@@ -641,15 +642,7 @@ class Directory(object):
 
         self.black_path_list.extend(black_path_list)
 
-        self.ext_list = []
-
-        if lans and lans in ext_dict:
-            for lan in lans:
-                self.ext_list.extend(ext_dict[lan])
-
-        else:
-            for lan in ext_dict:
-                self.ext_list.extend(ext_dict[lan])
+        self.ext_list = [ext_dict['php']]
 
     """
     :return {'.php': {'count': 2, 'list': ['/path/a.php', '/path/b.php']}}, file_sum, time_consume

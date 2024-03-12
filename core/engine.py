@@ -20,8 +20,6 @@ import portalocker
 
 from core.core_engine.php.parser import scan_parser as php_scan_parser
 from core.core_engine.php.engine import init_match_rule as php_init_match_rule
-from core.core_engine.javascript.parser import scan_parser as js_scan_parser
-from core.core_engine.javascript.engine import init_match_rule as js_init_match_rule
 
 from .rule import Rule
 from .cast import CAST
@@ -930,9 +928,6 @@ def init_match_rule(data, lan='php'):
     """
     if lan.lower() == "php":
         return php_init_match_rule(data)
-
-    if lan.lower() == "javascript":
-        return js_init_match_rule(data)
 
 
 def auto_parse_match(single_match, svid, language):
