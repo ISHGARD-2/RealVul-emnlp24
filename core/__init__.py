@@ -63,13 +63,14 @@ def main():
 
         logger.info("TaskID: {}".format(task_id))
         logger.info("[INIT] New Log file ScanTask_{}.log .".format(task_id))
-        log_name = "ScanTask_{}".format(task_id)
 
-        data = {
-            'status': 'running',
-            'report': ''
-        }
-        Running(task_id).status(data)
+
+        # log_name = "ScanTask_{}".format(task_id)
+        # data = {
+        #     'status': 'running',
+        #     'report': ''
+        # }
+        # Running(task_id).status(data)
 
         # generate function call relationship
         func_call = FuncCall(args.target, args.rule, a_sid=task_id)

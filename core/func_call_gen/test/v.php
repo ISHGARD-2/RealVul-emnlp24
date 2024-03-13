@@ -34,7 +34,7 @@ class b extends a{
         return "12";
     }
 }
-
+echo "123";
 function func1($func1_arg1){
     //echo 1;
     return $_GET["test"];

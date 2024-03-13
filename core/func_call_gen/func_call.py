@@ -8,6 +8,7 @@ from core.pretreatment import ast_gen
 
 class PhpRootNode():
     def __init__(self, nodes):
+        self.name = 'root'
         self.nodes = nodes
 
 
@@ -35,7 +36,7 @@ class FuncCall:
         self.special_rules = special_rules
         self.black_path = black_path
         self.aid = a_sid
-        self.pa = ast_gen(target_path, formatter, output, special_rules)
+        self.pa = ast_gen(ast_object, target_path, formatter, output, special_rules)
 
         file = codecs.open(target_path, "r", encoding='utf-8', errors='ignore')
         self.code_content = file.read().split('\n')
@@ -53,7 +54,6 @@ class FuncCall:
         # # function code
         # for func in self.function_list:
         #     self.analysis_call(func["node_ast"].nodes, func["father_list"])
-
 
         return
 
@@ -100,12 +100,30 @@ class FuncCall:
         add to function_list
         """
         new_nodes = []
+        new_code = "\n".join(self.code_content[0:nodes[0].lineno-1])
 
-        for node in nodes:
+        for i, node in enumerate(nodes):
             if isinstance(node, php.Class) or isinstance(node, php.Function) or isinstance(node, php.Method):
                 continue
 
+            start_pos = node.lineno -1
+            if i+1 == len(nodes):
+                end_pos = -1
+            else:
+                end_pos = nodes[i + 1].lineno -1
+            new_code += "\n" + "\n".join(self.code_content[start_pos:end_pos])
+
             new_nodes.append(node)
+
+        root_node = {}
+        root_node["node_name"] = "root"
+        root_node["node_type"] = None
+        root_node["father_list"] = []
+        root_node["node_ast"] = PhpRootNode(new_nodes)
+        root_node["code"] = new_code
+
+        self.function_list.append(root_node)
+
 
     def analysis_functions(self, nodes, father_list, isroot=False):
         """
@@ -128,7 +146,7 @@ class FuncCall:
                         next_node = nodes[i + 1]
                     node_code = self.get_func_code(node, next_node)
 
-                    #prepare function/method information
+                    # prepare function/method information
                     node_info = {}
                     node_info["node_name"] = node.name
                     node_info["node_type"] = node.__class__
