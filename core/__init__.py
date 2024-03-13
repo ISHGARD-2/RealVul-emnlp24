@@ -73,10 +73,11 @@ def main():
 
         # generate function call relationship
         func_call = FuncCall(args.target, args.rule, a_sid=task_id)
+        func_call.call_graph_gen()
 
 
 
-        cli.start(args.target, args.rule, a_sid=task_id)
+        cli.start(func_call.pa, args.target, args.rule, a_sid=task_id)
 
         t2 = time.time()
         logger.info('[INIT] Done! Consume Time:{ct}s'.format(ct=t2 - t1))

@@ -77,6 +77,10 @@ VENDOR_FILE_DICT = {
 
 VENDOR_VUL_LEVEL = ['None', 'low', 'low', 'low', 'medium', 'medium', 'medium', 'medium', 'high', 'high', 'high']
 
+VENDOR_ECOSYSTEM = {
+    'php': {"ossindex": "composer", "murphysec": "php"}
+}
+
 VENDOR_CVIID = 9999
 
 # base result class

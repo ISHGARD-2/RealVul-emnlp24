@@ -25,7 +25,7 @@ from utils.file import Directory
 from utils.utils import show_context
 from utils.utils import ParseArgs, get_sid
 from utils.utils import md5, random_generator
-from core.vendors import get_project_by_version, get_and_save_vendor_vuls
+from core.vendors import get_project_by_version
 from Kunlun_M.const import VUL_LEVEL, VENDOR_VUL_LEVEL
 
 from web.index.models import ScanTask, Rules, NewEvilFunc, VendorVulns
@@ -162,7 +162,7 @@ def display_result(scan_id, is_ask=False):
         logger.info("[MainThread] Scan id {} has no Result.".format(scan_id))
 
 
-def start(target, special_rules, formatter='csv', output='', a_sid=None, tamper_name=None, is_unconfirm=False, is_unprecom=False):
+def start(pa, target, special_rules, formatter='csv', output='', a_sid=None, tamper_name=None, is_unconfirm=False, is_unprecom=False):
     """
     Start CLI
     :param black_path: 
@@ -175,7 +175,7 @@ def start(target, special_rules, formatter='csv', output='', a_sid=None, tamper_
     :param a_sid: all scan id
     :return:
     # """
-    global pa
+    s_sid = get_sid(target)
     target_mode = pa.target_mode
     output_mode = pa.output_mode
     black_path_list = pa.black_path_list
@@ -402,14 +402,6 @@ def search_project(search_type, keyword, keyword_value, with_vuls=False):
                 vendor_vension = v.version
 
                 table.add_row([i, pid, pname, porigin, vendor_name, vendor_vension])
-
-                if with_vuls:
-                    vvs = get_and_save_vendor_vuls(0, vendor_name, vendor_vension, v.language, v.ext)
-
-                    for vv in vvs:
-                        j += 1
-
-                        table2.add_row([i, vv.vuln_id, vv.title, VENDOR_VUL_LEVEL[vv.severity], vv.cves, vv.reference, vv.vendor_name, vv.affected_versions])
 
         logger.info("Project List (Small than {} {}):\n{}".format(keyword, keyword_value, table))
         logger.info("Vendor {}:{} Vul List:\n{}".format(keyword, keyword_value, table2))

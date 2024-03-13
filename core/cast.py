@@ -16,7 +16,6 @@ import re
 import traceback
 
 from core.core_engine.php.parser import anlysis_params as php_anlysis_params
-from core.core_engine.javascript.parser import analysis_params as js_analysis_params
 
 from utils.file import File
 from utils.file import FileParseAll
@@ -256,62 +255,8 @@ class CAST(object):
                     else:
                         continue
 
-                # else:
-                elif self.language == 'java':
-                    # Java variable didn't have `$`
-                    param_block_code = self.block_code(0)
-                    if param_block_code is False:
-                        logger.debug("Can't get block code")
-                        return True, self.data
-                    logger.debug("[AST] Block code: ```{language}\r\n{code}```".format(language=self.language,
-                                                                                       code=param_block_code))
-                    regex_assign_string = self.regex[self.language]['assign_string'].format(re.escape(param_name))
-                    string = re.findall(regex_assign_string, param_block_code)
-                    if len(string) >= 1 and string[0] != '':
-                        logger.debug("[AST] Is assign string: `Yes`")
-                        continue
-                        # return False, self.data
-                    logger.debug("[AST] Is assign string: `No`")
-
-                    # Is assign out data
-                    regex_get_param = r'String\s{0}\s=\s\w+\.getParameter(.*)'.format(re.escape(param_name))
-                    get_param = re.findall(regex_get_param, param_block_code)
-                    if len(get_param) >= 1 and get_param[0] != '':
-                        logger.debug("[AST] Is assign out data: `Yes`")
-                        continue
-                        # False, self.data
-                    logger.debug("[AST] Is assign out data: `No`")
-                    return True, -1, self.data, []
-
-                elif self.language == "javascript":
-
-                    logger.debug("[AST] Is variable: `Yes`")
-                    logger.debug("[Deep AST] Start AST for param {param_name}".format(param_name=param_name))
-
-                    _is_co, _cp, expr_lineno, chain = js_analysis_params(param_name, [],
-                                                                         self.sr.vul_function, self.line, self.file_path,
-                                                                         self.repair_functions, self.controlled_list, isexternal=True)
-
-                    if _is_co == 1:
-                        logger.debug("[AST] Is assign string: `Yes`")
-                        return True, _is_co, _cp, chain
-                    elif _is_co == 3:
-                        pass
-                        # logger.info("[AST] can't find this param, Unconfirmed vulnerable..")
-                        # return True, _is_co, _cp, chain
-                    elif _is_co == 4:
-                        if hasattr(_cp[0], "name"):
-                            logger.info("[AST] New vul function {}()".format(_cp[0].name))
-                        else:
-                            logger.info("[AST] New vul function {}()".format(_cp[0]))
-
-                        return False, _is_co, tuple([_is_co, _cp]), chain
-
-                    else:
-                        continue
-
                 else:
-                    logger.debug("[AST] Not Java/PHP/Javascript, can't parse ({l})".format(l=self.language))
+                    logger.debug("[AST] Not PHP, can't parse ({l})".format(l=self.language))
                     continue
                     # return False, self.data
 

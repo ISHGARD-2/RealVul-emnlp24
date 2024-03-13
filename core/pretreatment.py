@@ -464,7 +464,6 @@ ast_object = Pretreatment()
 
 
 def ast_gen(target_path, formatter, output, special_rules):
-    global pa, test
     s_sid = get_sid(target_path)
 
     # parse target mode
@@ -488,3 +487,5 @@ def ast_gen(target_path, formatter, output, special_rules):
     # Pretreatment ast object
     ast_object.init_pre(target_directory, files)
     ast_object.pre_ast_all(main_language, is_unprecom=False)
+
+    return pa

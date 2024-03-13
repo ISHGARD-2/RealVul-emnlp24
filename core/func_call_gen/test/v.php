@@ -32,9 +32,9 @@ class b extends a{
     }
 }
 
-function _func1(){
+function func1(){
         echo 1;
 }
 
-a = a();
-a.a_meth1();
+$a = a();
+$a.a_meth1();
