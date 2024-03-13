@@ -147,16 +147,16 @@ def score2level(score):
         return '{l}-{s}: {ast}'.format(l=level[:1], s=score_full, ast=a)
 
 
-def scan_single(target_directory, single_rule, files=None, language=None, tamper_name=None, is_unconfirm=False,
+def scan_single(func_call, target_directory, single_rule, files=None, language=None, tamper_name=None, is_unconfirm=False,
                 newcore_function_list=[]):
     try:
-        return SingleRule(target_directory, single_rule, files, language, tamper_name, is_unconfirm,
+        return SingleRule(func_call, target_directory, single_rule, files, language, tamper_name, is_unconfirm,
                           newcore_function_list).process()
     except Exception:
         raise
 
 
-def scan(target_directory, a_sid=None, s_sid=None, special_rules=None, language=None, framework=None, file_count=0,
+def scan(func_call, target_directory, a_sid=None, s_sid=None, special_rules=None, language=None, framework=None, file_count=0,
          extension_count=0, files=None, tamper_name=None, is_unconfirm=False):
     r = Rule(language)
     rules = r.rules(special_rules)
@@ -172,8 +172,8 @@ def scan(target_directory, a_sid=None, s_sid=None, special_rules=None, language=
         else:
             logger.debug('[SCAN] [STORE] Not found vulnerabilities on this rule!')
 
-    async def start_scan(target_directory, rule, files, language, tamper_name):
-        result = scan_single(target_directory, rule, files, language, tamper_name, is_unconfirm, newcore_function_list)
+    async def start_scan(func_call, target_directory, rule, files, language, tamper_name):
+        result = scan_single(func_call, target_directory, rule, files, language, tamper_name, is_unconfirm)
         store(result)
 
     if len(rules) == 0:
@@ -200,7 +200,7 @@ def scan(target_directory, a_sid=None, s_sid=None, special_rules=None, language=
             language=rule.language
         ))
         # result = scan_single(target_directory, rule, files, language, tamper_name)
-        scan_list.append(start_scan(target_directory, rule, files, language, tamper_name))
+        scan_list.append(start_scan(func_call, target_directory, rule, files, language, tamper_name))
         # store(result)
 
     loop = asyncio.get_event_loop()
@@ -332,8 +332,9 @@ def scan(target_directory, a_sid=None, s_sid=None, special_rules=None, language=
 
 
 class SingleRule(object):
-    def __init__(self, target_directory, single_rule, files, language=None, tamper_name=None, is_unconfirm=False,
+    def __init__(self, func_call, target_directory, single_rule, files, language=None, tamper_name=None, is_unconfirm=False,
                  newcore_function_list=[]):
+        self.func_call = func_call
         self.target_directory = target_directory
         self.sr = single_rule
         self.files = files
@@ -536,7 +537,7 @@ class SingleRule(object):
             is_test = False
 
             try:
-                datas = Core(self.target_directory, vulnerability, self.sr, 'project name',
+                datas = Core(self.func_call, self.target_directory, vulnerability, self.sr, 'project name',
                              ['whitelist1', 'whitelist2'], test=is_test, index=index,
                              files=self.files, languages=self.languages, tamper_name=self.tamper_name,
                              is_unconfirm=self.is_unconfirm).scan()
@@ -608,7 +609,7 @@ class SingleRule(object):
 
 
 class Core(object):
-    def __init__(self, target_directory, vulnerability_result, single_rule, project_name, white_list, test=False,
+    def __init__(self, func_call, target_directory, vulnerability_result, single_rule, project_name, white_list, test=False,
                  index=0, files=None, languages=None, tamper_name=None, is_unconfirm=False):
         """
         Initialize
@@ -622,6 +623,7 @@ class Core(object):
         :param files: core file list
         :param tamper_name: tamper name
         """
+        self.func_call = func_call
         self.data = []
         self.repair_dict = {}
         self.repair_functions = []
@@ -777,9 +779,9 @@ class Core(object):
         :return: is_vulnerability, code
         """
         self.method = 0
-        self.code_content = self.code_content
-        if len(self.code_content) > 512:
-            self.code_content = self.code_content[:500]
+        # self.code_content = self.code_content
+        # if len(self.code_content) > 512:
+        #     self.code_content = self.code_content[:500]
         self.status = self.status_init
         self.repair_code = self.repair_code_init
 
@@ -807,7 +809,7 @@ class Core(object):
                 self.init_php_repair()
 
                 # organize information about vulnerability
-                ast = CAST(self.rule_match, self.target_directory, self.file_path, self.line_number,
+                ast = CAST(self.func_call, self.rule_match, self.target_directory, self.file_path, self.line_number,
                            self.code_content, files=self.files, rule_class=self.single_rule,
                            repair_functions=self.repair_functions, controlled_params=self.controlled_list)
 

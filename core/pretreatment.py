@@ -53,6 +53,10 @@ class Pretreatment:
         self.target_directory = target_directory
 
         self.target_directory = os.path.normpath(self.target_directory)
+        for fileext in self.file_list:
+            self.target_queue.put(fileext)
+
+
 
     def get_path(self, filepath):
         os.chdir(os.path.dirname(os.path.dirname(__file__)))
@@ -70,18 +74,8 @@ class Pretreatment:
 
     def pre_ast_all(self, lan=None, is_unprecom=False):
 
-        if lan is not None:
-            # 检查是否在可ast pasre列表中
-            if not list(set(lan).intersection(set(could_ast_pase_lans))):
-                logger.info("[AST][Pretreatment] Current scan target language does not require ast pretreatment...")
-                return True
-
-        for fileext in self.file_list:
-            self.target_queue.put(fileext)
-
         # 设置公共变量用于判断是否设定了扫描语言
         self.lan = lan
-
         # 设置标志位标识跳过预编译阶段
         self.is_unprecom = is_unprecom
 

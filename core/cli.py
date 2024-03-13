@@ -162,7 +162,7 @@ def display_result(scan_id, is_ask=False):
         logger.info("[MainThread] Scan id {} has no Result.".format(scan_id))
 
 
-def start(pa, target, special_rules, formatter='csv', output='', a_sid=None, tamper_name=None, is_unconfirm=False, is_unprecom=False):
+def start(func_call, pa, target, special_rules, formatter='csv', output='', a_sid=None, tamper_name=None, is_unconfirm=False, is_unprecom=False):
     """
     Start CLI
     :param black_path: 
@@ -177,14 +177,11 @@ def start(pa, target, special_rules, formatter='csv', output='', a_sid=None, tam
     # """
     s_sid = get_sid(target)
     target_mode = pa.target_mode
-    output_mode = pa.output_mode
     black_path_list = pa.black_path_list
 
     # target directory
     try:
-        logger.info('[CLI] Target Mode: {}'.format(target_mode))
         target_directory = pa.target_directory(target_mode)
-        logger.info('[CLI] Target : {d}'.format(d=target_directory))
 
         # static analyse files info
         files, file_count, time_consume = Directory(target_directory, black_path_list).collect_files()
@@ -193,20 +190,8 @@ def start(pa, target, special_rules, formatter='csv', output='', a_sid=None, tam
         main_language = pa.language
         main_framework = pa.language
 
-        logger.info('[CLI] [STATISTIC] Language: {l} Framework: {f}'.format(l=",".join(main_language), f=main_framework))
-        logger.info('[CLI] [STATISTIC] Files: {fc}, Extensions:{ec}, Consume: {tc}'.format(fc=file_count,
-                                                                                           ec=len(files),
-                                                                                           tc=time_consume))
-
-        if pa.special_rules is not None:
-            logger.info('[CLI] [SPECIAL-RULE] only scan used by {r}'.format(r=','.join(pa.special_rules)))
-
-        # Pretreatment ast object
-        ast_object.init_pre(target_directory, files)
-        ast_object.pre_ast_all(main_language, is_unprecom=is_unprecom)
-
         # scan
-        scan(target_directory=target_directory, a_sid=a_sid, s_sid=s_sid, special_rules=pa.special_rules,
+        scan(func_call, target_directory=target_directory, a_sid=a_sid, s_sid=s_sid, special_rules=pa.special_rules,
              language=main_language, framework=main_framework, file_count=file_count, extension_count=len(files),
              files=files, tamper_name=tamper_name, is_unconfirm=is_unconfirm)
 

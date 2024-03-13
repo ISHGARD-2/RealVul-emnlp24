@@ -77,7 +77,7 @@ def main():
 
 
 
-        cli.start(func_call.pa, args.target, args.rule, a_sid=task_id)
+        cli.start(func_call, func_call.pa, args.target, args.rule, a_sid=task_id)
 
         t2 = time.time()
         logger.info('[INIT] Done! Consume Time:{ct}s'.format(ct=t2 - t1))

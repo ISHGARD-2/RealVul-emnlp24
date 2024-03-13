@@ -1552,7 +1552,7 @@ def get_function_params(nodes):
     return params
 
 
-def anlysis_params(param, file_path, vul_lineno, vul_function=None, repair_functions=None, controlled_params=None,
+def anlysis_params(func_call, param, file_path, vul_lineno, vul_function=None, repair_functions=None, controlled_params=None,
                    isexternal=False):
     """
     在cast调用时做中转数据预处理

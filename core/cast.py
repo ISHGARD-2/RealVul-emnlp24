@@ -29,7 +29,8 @@ class CAST(object):
                  'sol': "sol",
                  'js': "javascript"}
 
-    def __init__(self, rule, target_directory, file_path, line, code, files=None, rule_class=None, repair_functions=[], controlled_params=[]):
+    def __init__(self,func_call, rule, target_directory, file_path, line, code, files=None, rule_class=None, repair_functions=[], controlled_params=[]):
+        self.func_call = func_call
         self.target_directory = target_directory
         self.data = []
         self.rule = rule
@@ -217,6 +218,7 @@ class CAST(object):
             try:
                 self.param_name = param_name
                 logger.debug('[AST] Param: `{0}`'.format(param_name))
+
                 # all is string
                 regex_string = self.regex[self.language]['string']
                 string = re.findall(regex_string, param_name)
@@ -240,7 +242,7 @@ class CAST(object):
                     logger.debug("[AST] Is variable: `Yes`")
                     logger.debug("[Deep AST] Start AST for param {param_name}".format(param_name=param_name))
 
-                    _is_co, _cp, expr_lineno, chain = php_anlysis_params(param_name, self.file_path, self.line, self.sr.vul_function, self.repair_functions, self.controlled_list, isexternal=True)
+                    _is_co, _cp, expr_lineno, chain = php_anlysis_params(self.func_call, param_name, self.file_path, self.line, self.sr.vul_function, self.repair_functions, self.controlled_list, isexternal=True)
 
                     if _is_co == 1:
                         logger.debug("[AST] Is assign string: `Yes`")
