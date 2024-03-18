@@ -46,7 +46,6 @@ class ParseArgs(object):
         self.language = ['php']
         logger.info("[INIT][PARSE_ARGS] Only one Language {}.".format(self.language))
         self.sid = a_sid
-        self.black_path_list = []
 
         if special_rules != None and special_rules != '':
             self.special_rules = []
@@ -99,10 +98,6 @@ class ParseArgs(object):
         :return: str
         """
         target_mode = None
-        target_git_cases = ['http://', 'https://', 'ssh://']
-        for tgc in target_git_cases:
-            if self.target[0:len(tgc)] == tgc:
-                target_mode = TARGET_MODE_GIT
 
         if os.path.isfile(self.target):
             target_mode = TARGET_MODE_FILE
@@ -114,26 +109,26 @@ class ParseArgs(object):
         logger.debug('[PARSE-ARGS] Target Mode: {mode}'.format(mode=target_mode))
         return target_mode
 
-    @property
-    def output_mode(self):
-        """
-        Parse output mode (api/mail/file/stream)
-        :return: str
-        """
-        output_mode = None
-        output_mode_api = ['http', 'https']
-        output_mode_mail = r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
-        if re.match(output_mode_mail, self.output) is not None:
-            output_mode = OUTPUT_MODE_MAIL
-        for oma in output_mode_api:
-            if self.output[0:len(oma)] == oma:
-                output_mode = OUTPUT_MODE_API
-        if os.path.isdir(os.path.dirname(self.output)):
-            output_mode = OUTPUT_MODE_FILE
-        if output_mode is None:
-            output_mode = OUTPUT_MODE_STREAM
-        logger.debug('[PARSE-ARGS] Output Mode: {mode}'.format(mode=output_mode))
-        return output_mode
+    # @property
+    # def output_mode(self):
+    #     """
+    #     Parse output mode (api/mail/file/stream)
+    #     :return: str
+    #     """
+    #     output_mode = None
+    #     output_mode_api = ['http', 'https']
+    #     output_mode_mail = r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
+    #     if re.match(output_mode_mail, self.output) is not None:
+    #         output_mode = OUTPUT_MODE_MAIL
+    #     for oma in output_mode_api:
+    #         if self.output[0:len(oma)] == oma:
+    #             output_mode = OUTPUT_MODE_API
+    #     if os.path.isdir(os.path.dirname(self.output)):
+    #         output_mode = OUTPUT_MODE_FILE
+    #     if output_mode is None:
+    #         output_mode = OUTPUT_MODE_STREAM
+    #     logger.debug('[PARSE-ARGS] Output Mode: {mode}'.format(mode=output_mode))
+    #     return output_mode
 
     def target_directory(self, target_mode):
         target_directory = None

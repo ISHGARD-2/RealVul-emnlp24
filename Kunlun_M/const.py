@@ -12,7 +12,7 @@
     :copyright: Copyright (c) 2017 Feei. All rights reserved
 """
 
-# Match-Mode
+# Match-Mode sink匹配方式
 mm_function_param_controllable = 'function-param-regex'  # 函数正则匹配
 mm_regex_param_controllable = 'vustomize-match'  # 自定义匹配
 mm_regex_only_match = 'only-regex'
@@ -82,6 +82,9 @@ VENDOR_ECOSYSTEM = {
 }
 
 VENDOR_CVIID = 9999
+
+# built in function names
+BUILTIN_FUNC = open("buildin_func.txt", "w", encoding="utf-8").read().split('\n')
 
 # base result class
 

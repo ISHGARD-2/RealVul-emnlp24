@@ -20,8 +20,10 @@ import logging
 import traceback
 
 import argparse
-from utils.log import log, logger
 
+from utils.file import Directory
+from utils.log import log, logger
+from utils.utils import get_sid, ParseArgs
 
 from . import cli
 from .engine import Running
@@ -35,6 +37,51 @@ from core.func_call_gen.func_call import FuncCall
 # except NameError as e:
 #     pass
 
+NEWLINE_FLAGS = ["<?php", "{", "}", ";"]
+
+def args_prepare(args):
+    # 标识任务id
+    task_name = str(args.target) + " rule_id: " + str(args.rule)
+    task_id = hash(task_name) % 10000
+    logger.info("TaskID: {}".format(task_id))
+    logger.info("[INIT] New Log file ScanTask_{}.log .".format(task_id))
+
+    s_sid = get_sid(args.target)
+
+    # parse target mode
+    pa = ParseArgs(args.target, "csv", "", args.rule)
+    target_mode = pa.target_mode
+
+    # target directory
+    logger.info('[CLI] Target Mode: {}'.format(target_mode))
+    target_directory = pa.target_directory(target_mode)
+    logger.info('[CLI] Target : {d}'.format(d=target_directory))
+
+    # static analyse files info
+    files, file_count, time_consume = Directory(target_directory).collect_files()
+
+    main_language = pa.language
+
+    logger.info(
+        '[CLI] [STATISTIC] Language: {l}'.format(l=",".join(main_language)))
+    logger.info('[CLI] [STATISTIC] Files: {fc}, Extensions:{ec}, Consume: {tc}'.format(fc=file_count, ec=len(files),
+                                                                                       tc=time_consume))
+
+    return pa, task_name, task_id, s_sid, target_mode, target_directory, files, file_count, main_language
+
+def args_format():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-t', '--target', dest='target', type=str, default='', help="target file")
+    parser.add_argument('-r', '--rule', dest='rule', type=str, default=None, help="vulnerability rule")
+    args = parser.parse_args()
+
+    if not hasattr(args, "target") or args.target == '':
+        parser.print_help()
+        exit()
+    logger.debug('[INIT] start Scan Task...')
+
+    return args
+
 
 def main():
     try:
@@ -45,40 +92,20 @@ def main():
         log(logging.INFO)
         logger.debug('[INIT] set logging level: {}'.format(logging.getLogger().level))
 
-        parser = argparse.ArgumentParser()
-        parser.add_argument('-t', '--target', dest='target', type=str, default='', help="target file")
-        parser.add_argument('-r', '--rule', dest='rule', type=str, default=None, help="vulnerability rule")
-        args = parser.parse_args()
+        # args
+        args = args_format()
 
-        if not hasattr(args, "target") or args.target == '':
-            parser.print_help()
-            exit()
-        logger.debug('[INIT] start Scan Task...')
+        # prepare args
+        pa, task_name, task_id, s_sid, target_mode, target_directory, files, file_count, main_language = args_prepare(args)
 
-
-        # 标识任务id
-        task_name = str(args.target) + " rule_id: " + str(args.rule)
-        task_id = hash(task_name) % 10000
-
-
-        logger.info("TaskID: {}".format(task_id))
-        logger.info("[INIT] New Log file ScanTask_{}.log .".format(task_id))
-
-
-        # log_name = "ScanTask_{}".format(task_id)
-        # data = {
-        #     'status': 'running',
-        #     'report': ''
-        # }
-        # Running(task_id).status(data)
 
         # generate function call relationship
-        func_call = FuncCall(args.target, args.rule, a_sid=task_id)
-        func_call.call_graph_gen()
+        func_call = FuncCall(target_directory, files, file_count, args.rule, a_sid=task_id)
+        func_call.function_call_collection()
 
 
 
-        cli.start(func_call, func_call.pa, args.target, args.rule, a_sid=task_id)
+        #cli.start(func_call, func_call.pa, args.target, args.rule, a_sid=task_id)
 
         t2 = time.time()
         logger.info('[INIT] Done! Consume Time:{ct}s'.format(ct=t2 - t1))

@@ -57,8 +57,6 @@ class Pretreatment:
         for fileext in self.file_list:
             self.target_queue.put(fileext)
 
-
-
     def get_path(self, filepath):
         os.chdir(os.path.dirname(os.path.dirname(__file__)))
 
@@ -95,9 +93,10 @@ class Pretreatment:
             self.pre_result['ast_nodes'] = all_nodes
 
         except SyntaxError as e:
-            logger.warning('[AST] [ERROR] parser SyntaxError. \n code: {}'.format("\n"+code_content+"\n"))
+            logger.warning('[AST] [ERROR] parser SyntaxError. \n code: {}'.format("\n" + code_content + "\n"))
         except AssertionError as e:
-            logger.warning('[AST] [ERROR] parser {}:\n code: {}'.format(traceback.format_exc(), "\n"+code_content+"\n"))
+            logger.warning(
+                '[AST] [ERROR] parser {}:\n code: {}'.format(traceback.format_exc(), "\n" + code_content + "\n"))
         except:
             logger.warning('[AST] something error, {}'.format(traceback.format_exc()))
 
@@ -227,40 +226,19 @@ class Pretreatment:
             return "not_found"
 
 
-ast_object = Pretreatment()
+ast_list = []
+ast_object=Pretreatment()
 
-
-def get_ast_object(name):
+def gen_ast(name):
     ast = Pretreatment(name)
+    ast_list.append({"name": ast})
     return ast
 
 
-def ast_gen(ast, target_path, formatter, output, special_rules):
-    """
-    generate ast
-    """
-    s_sid = get_sid(target_path)
+def get_ast_by_name(name):
+    if ast_list[name]:
+        return ast_list[name]
+    return None
 
-    # parse target mode
-    pa = ParseArgs(target_path, formatter, output, special_rules)
-    target_mode = pa.target_mode
 
-    # target directory
-    logger.info('[CLI] Target Mode: {}'.format(target_mode))
-    target_directory = pa.target_directory(target_mode)
-    logger.info('[CLI] Target : {d}'.format(d=target_directory))
 
-    # static analyse files info
-    files, file_count, time_consume = Directory(target_directory).collect_files()
-
-    main_language = pa.language
-    logger.info(
-        '[CLI] [STATISTIC] Language: {l}'.format(l=",".join(main_language)))
-    logger.info('[CLI] [STATISTIC] Files: {fc}, Extensions:{ec}, Consume: {tc}'.format(fc=file_count, ec=len(files),
-                                                                                       tc=time_consume))
-
-    # Pretreatment ast object
-    ast.init_pre(target_directory, files)
-    ast.pre_ast_all(main_language, is_unprecom=False)
-
-    return pa

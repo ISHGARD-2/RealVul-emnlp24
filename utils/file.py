@@ -48,10 +48,6 @@ def file_list_parse(filelist, language=None):
     for file in filelist:
         # * for base
         if file[0] in self_ext_list or '*' in self_ext_list:
-            # if file[0] in ['.crx'] and language == "javascript":
-            #     for filepath in file[1]['list']:
-            #         result.extend(ast_object.get_child_files(filepath))
-            # else:
             result.extend(file[1]['list'])
 
     return result
@@ -237,6 +233,62 @@ def check_kunlunignore(filename):
     return True
 
 
+class FileParse:
+    def __init__(self, filelist, target, language='php'):
+        self.filelist = filelist
+        self.t_filelist = file_list_parse(filelist, language)
+        self.target = target
+        self.language = language
+
+def check_comment(content):
+    backstr = ""
+    lastchar = ""
+    isinlinecomment = False
+    isduolinecomment = False
+
+    for char in content:
+        if char == '/' and lastchar == '/':
+            backstr = backstr[:-1]
+            isinlinecomment = True
+            lastchar = ""
+            continue
+
+        if isinlinecomment:
+            if char == '\n':
+                isinlinecomment = False
+
+                lastchar = ''
+                backstr += '\n'
+            continue
+
+
+        if char == '\n':
+            backstr += '\n'
+            continue
+
+        # 多行注释
+        if char == '*' and lastchar == '/':
+            isduolinecomment = True
+            backstr = backstr[:-1]
+            lastchar = ""
+            continue
+
+        if isduolinecomment:
+
+            if char == '/' and lastchar == '*':
+                isduolinecomment = False
+                lastchar = ""
+                continue
+
+            lastchar = char
+            continue
+
+        lastchar = char
+        backstr += char
+
+    return backstr
+
+
 class FileParseAll:
     def __init__(self, filelist, target, language='php'):
         self.filelist = filelist
@@ -244,59 +296,7 @@ class FileParseAll:
         self.target = target
         self.language = language
 
-    def check_comment(self, content):
-        backstr = ""
 
-        if self.language in ['php', 'javascript']:
-
-            lastchar = ""
-            isinlinecomment = False
-            isduolinecomment = False
-
-            for char in content:
-                if char == '/' and lastchar == '/':
-                    backstr = backstr[:-1]
-                    isinlinecomment = True
-                    lastchar = ""
-                    continue
-
-                if isinlinecomment:
-                    if char == '\n':
-                        isinlinecomment = False
-
-                        lastchar = ''
-                        backstr += '\n'
-                    continue
-
-
-                if char == '\n':
-                    backstr += '\n'
-                    continue
-
-                # 多行注释
-                if char == '*' and lastchar == '/':
-                    isduolinecomment = True
-                    backstr = backstr[:-1]
-                    lastchar = ""
-                    continue
-
-                if isduolinecomment:
-
-                    if char == '/' and lastchar == '*':
-                        isduolinecomment = False
-                        lastchar = ""
-                        continue
-
-                    lastchar = char
-                    continue
-
-                lastchar = char
-                backstr += char
-
-            return backstr
-
-        else:
-            return content
 
     def grep(self, reg):
         """
@@ -326,7 +326,7 @@ class FileParseAll:
                 if i < 10:
                     continue
 
-                content = self.check_comment(content)
+                content = check_comment(content)
 
                 i = 0
                 # print line, line_number
@@ -352,7 +352,7 @@ class FileParseAll:
 
                 content = ""
 
-            content = self.check_comment(content)
+            content = check_comment(content)
 
             # 如果退出循环的时候没有清零，则还要检查一次
             if i > 0:
