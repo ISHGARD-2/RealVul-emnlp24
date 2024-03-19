@@ -42,7 +42,7 @@ class b extends a{
     }
 }
 echo "123";
-function func1(&$func1_arg1){
+function func1(&$func1_arg1, $ttt=1){
     //echo 1;
     return $_GET["test"];
 }
@@ -53,5 +53,6 @@ $a = new a();
 $bb = $a->a_meth1();
 echo $a->a_arg1;
 new b();
-func1("123"."qwe".$a->a_meth1());
+func1("123"."qwe".$a->a_meth1(), $ttt=1);
+$bb += 1;
 

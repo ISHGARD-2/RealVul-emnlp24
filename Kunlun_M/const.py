@@ -84,7 +84,8 @@ VENDOR_ECOSYSTEM = {
 VENDOR_CVIID = 9999
 
 # built in function names
-BUILTIN_FUNC = open("buildin_func.txt", "w", encoding="utf-8").read().split('\n')
+code = open("Kunlun_M/buildin_func.txt", "r", encoding="utf-8").read()
+BUILTIN_FUNC = code.split('\n')
 
 # base result class
 

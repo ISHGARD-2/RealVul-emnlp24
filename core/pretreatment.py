@@ -9,6 +9,7 @@
 from phply.phplex import lexer  # 词法分析
 from phply.phpparse import make_parser  # 语法分析
 from phply import phpast as php
+from utils.file import check_comment
 
 from bs4 import BeautifulSoup
 
@@ -120,6 +121,7 @@ class Pretreatment:
 
                     fi = codecs.open(filepath, "r", encoding='utf-8', errors='ignore')
                     code_content = fi.read()
+                    code_content = check_comment(code_content)
                     fi.close()
 
                     # self.pre_result[filepath]['content'] = code_content
