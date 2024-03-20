@@ -25,7 +25,6 @@ from utils.file import Directory
 from utils.log import log, logger
 from utils.utils import ParseArgs
 
-from . import cli
 from core.preprocess.func_call import FuncCall
 from .engine import scan
 
