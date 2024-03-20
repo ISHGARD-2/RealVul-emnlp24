@@ -105,7 +105,6 @@ class FuncCall:
 
     def __init__(self, target_directory, files, file_count, special_rules, a_sid=None):
         # output
-        self.call_graph = []
         self.function_list = []
         self.call_list = []
 
@@ -174,9 +173,13 @@ class FuncCall:
                 is_recursion = True
 
             # assignment expr
-            elif isinstance(node, php.Assignment) or isinstance(node, php.ListAssignment) or isinstance(node,
-                                                                                                        php.AssignOp):
+            elif isinstance(node, php.Assignment) or isinstance(node, php.ListAssignment):
                 self.single_line_call_collect(node, father_list, newlineno, file, stmt_type="assign")
+                is_recursion = True
+
+            # Op
+            elif isinstance(node, php.AssignOp):
+                self.single_line_call_collect(node, father_list, newlineno, file, stmt_type="op")
                 is_recursion = True
 
             # direct function call
@@ -242,12 +245,9 @@ class FuncCall:
             # judge is function call
             if isinstance(node, php.FunctionCall) or isinstance(node, php.MethodCall) or isinstance(node, php.StaticMethodCall):
                 class_name = None
-                if not isinstance(node, php.FunctionCall):
-                    class_name = node.class_
-                    if class_name == "parent":
-                        # find parent class
-
-                func = self.func_match(node, node.__class__.__name__, father_list, file, class_name, class_)
+                if isinstance(node, php.StaticMethodCall):
+                    class_name = str(node.class_)
+                func = self.func_match(node, node.__class__.__name__, father_list, file, class_name)
                 if func:
                     one_call = OneCall(func, node.__class__.__name__, node, father_call)
                     function_call_list_in_stmt.append(one_call)
@@ -276,20 +276,24 @@ class FuncCall:
                     if n.__class__.__name__ == "Parameter":
                         q.put((n.node, father_call))
 
-
         # save statement with call
-        statement = file.code_content[lineno]
-        ast = root_node
-        func_location = father_list
-        file_location = file
-        callstmt = CallStatement(function_call_list_in_stmt, statement, ast, lineno, func_location, file_location)
+        if len(function_call_list_in_stmt):
+            statement = file.code_content[lineno]
+            ast = root_node
+            func_location = father_list
+            file_location = file
+            callstmt = CallStatement(function_call_list_in_stmt, statement, ast, lineno, func_location, file_location)
 
-        self.call_list.append(callstmt)
+            self.call_list.append(callstmt)
 
-    def func_match(self, node, type, father_list, file, class_name=None, class_=None):
+
+
+
+    def func_match(self, node, type, father_list, file, class_name=None):
         """
         match functionCall with function in self.function_list
         """
+        father_list = father_list[:-1]
         func_call_name = node.name
         if "Method" in type:
             type = "Method"
@@ -306,17 +310,21 @@ class FuncCall:
             return same_name_func[0]
         elif len(same_name_func) > 1:
             logger.warning(
-                "[WARNING] function match multy result:\n\t\t\trealm: {}, \tfunction name:".format(father_list,
+                "[WARNING] function match multy result:\n\t\t\trealm: {}, \n\tfunction name:".format(father_list,
                                                                                                    same_name_func[
                                                                                                        0].func_name))
             result_func = None
             for func in same_name_func:
                 if len(father_list) == len(func.father_list):
                     match = True
-                    for i in range(father_list):
-                        if father_list[i]["name"] != func.father_list["name"] or father_list[i]["type"] != \
-                                func.father_list["type"]:
+                    for i in range(len(father_list)):
+                        if father_list[i]["name"] != func.father_list[i]["name"] or father_list[i]["type"] != \
+                                func.father_list[i]["type"]:
                             match = False
+                            break
+                    if not match:
+                        if class_name == "parent":
+                            result_func = func
                             break
                     if match:
                         result_func = func
@@ -364,6 +372,8 @@ class FuncCall:
                         break
                 if find_buildin:
                     #         return FunctionInfo(func, "build_in", [], None, None, None)
+                    logger.debug(
+                        "[DEBUG] function match found buildin: {} in file: {}".format(func_call_name, file.file_path))
                     return None
                 else:
                     logger.error(
