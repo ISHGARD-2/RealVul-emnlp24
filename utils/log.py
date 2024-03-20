@@ -1,16 +1,4 @@
-# -*- coding: utf-8 -*-
 
-"""
-    log
-    ~~~
-
-    Implements color logger
-
-    :author:    LoRexxar <LoRexxar@gmail.com>
-    :homepage:  https://github.com/LoRexxar/Kunlun-M
-    :license:   MIT, see LICENSE for more details.
-    :copyright: Copyright (c) 2017 Feei. All rights reserved
-"""
 import os
 import logging
 import colorlog

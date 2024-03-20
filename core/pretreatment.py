@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 
 from phply.phplex import lexer  # 词法分析
 from phply.phpparse import make_parser  # 语法分析
@@ -6,7 +5,7 @@ from phply import phpast as php
 from utils.file import check_comment
 
 from utils.log import logger
-from settings.const import ext_dict
+from configs.const import ext_dict
 
 import gc
 import os
