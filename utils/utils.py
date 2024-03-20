@@ -24,7 +24,7 @@ import zipfile
 from Kunlun_M.settings import RULES_PATH, PROJECT_DIRECTORY
 
 from utils.log import logger, logger_console
-from utils.file import check_filepath, get_line, un_zip
+from utils.file import check_filepath, un_zip
 
 TARGET_MODE_GIT = 'git'
 TARGET_MODE_FILE = 'file'
@@ -676,38 +676,38 @@ def file_output_format(content):
         return 'None'
 
 
-def show_context(filename, line_number, show_line=3, is_back=False):
-
-    if not show_line:
-        return ""
-
-    if not line_number:
-        return False
-
-    filename = check_filepath(PROJECT_DIRECTORY, filename)
-
-    line_number = line_number if line_number else 0
-    line_start = int(line_number) - show_line if (int(line_number) - show_line) > 0 else 0
-    line_start = line_start if line_start else 1
-    line_end = int(line_start) + show_line + show_line
-
-    lines = get_line(filename, "{},{}".format(line_start, line_end))
-
-    contents = ""
-
-    i = 0
-    for line in lines:
-
-        if not is_back:
-            if line_start + i == int(line_number):
-                logger_console.warning("%4d: %s" % (line_start+i, line.replace("\n", "")))
-            else:
-                logger_console.info("%4d: %s" % (line_start+i, line.replace("\n", "")))
-
-        contents += "%4d: %s" % (line_start+i, line)
-        i += 1
-
-    return contents
+# def show_context(filename, line_number, show_line=3, is_back=False):
+#
+#     if not show_line:
+#         return ""
+#
+#     if not line_number:
+#         return False
+#
+#     filename = check_filepath(PROJECT_DIRECTORY, filename)
+#
+#     line_number = line_number if line_number else 0
+#     line_start = int(line_number) - show_line if (int(line_number) - show_line) > 0 else 0
+#     line_start = line_start if line_start else 1
+#     line_end = int(line_start) + show_line + show_line
+#
+#     lines = get_line(filename, "{},{}".format(line_start, line_end))
+#
+#     contents = ""
+#
+#     i = 0
+#     for line in lines:
+#
+#         if not is_back:
+#             if line_start + i == int(line_number):
+#                 logger_console.warning("%4d: %s" % (line_start+i, line.replace("\n", "")))
+#             else:
+#                 logger_console.info("%4d: %s" % (line_start+i, line.replace("\n", "")))
+#
+#         contents += "%4d: %s" % (line_start+i, line)
+#         i += 1
+#
+#     return contents
 
 
 def del_sensitive_for_config(param_config):

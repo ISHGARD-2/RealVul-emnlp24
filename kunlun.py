@@ -8,9 +8,9 @@ import sys
 # for django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Kunlun_M.settings')
 
-import django
-
-django.setup()
+# import django
+#
+# django.setup()
 
 from core import main
 

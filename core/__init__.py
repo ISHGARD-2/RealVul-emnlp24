@@ -23,31 +23,14 @@ import argparse
 
 from utils.file import Directory
 from utils.log import log, logger
-from utils.utils import get_sid, ParseArgs
+from utils.utils import ParseArgs
 
 from . import cli
-from .engine import Running
-from core.rule import RuleCheck, TamperCheck
 from core.func_call_gen.func_call import FuncCall
+from .engine import scan
 
-
-# try:
-#     reload(sys)
-#     sys.setdefaultencoding('utf-8')
-# except NameError as e:
-#     pass
-
-NEWLINE_FLAGS = ["<?php", "{", "}", ";"]
 
 def args_prepare(args):
-    # 标识任务id
-    task_name = str(args.target) + " rule_id: " + str(args.rule)
-    task_id = hash(task_name) % 10000
-    logger.info("TaskID: {}".format(task_id))
-    logger.info("[INIT] New Log file ScanTask_{}.log .".format(task_id))
-
-    s_sid = get_sid(args.target)
-
     # parse target mode
     pa = ParseArgs(args.target, "csv", "", args.rule)
     target_mode = pa.target_mode
@@ -59,15 +42,11 @@ def args_prepare(args):
 
     # static analyse files info
     files, file_count, time_consume = Directory(target_directory).collect_files()
-
-    main_language = pa.language
-
-    logger.info(
-        '[CLI] [STATISTIC] Language: {l}'.format(l=",".join(main_language)))
     logger.info('[CLI] [STATISTIC] Files: {fc}, Extensions:{ec}, Consume: {tc}'.format(fc=file_count, ec=len(files),
                                                                                        tc=time_consume))
 
-    return pa, task_name, task_id, s_sid, target_mode, target_directory, files, file_count, main_language
+    return pa, target_directory, files
+
 
 def args_format():
     parser = argparse.ArgumentParser()
@@ -96,16 +75,14 @@ def main():
         args = args_format()
 
         # prepare args
-        pa, task_name, task_id, s_sid, target_mode, target_directory, files, file_count, main_language = args_prepare(args)
-
+        pa, target_directory, files = args_prepare(args)
 
         # generate function call relationship
-        func_call = FuncCall(target_directory, files, file_count, args.rule, a_sid=task_id)
+        func_call = FuncCall(target_directory, files)
         func_call.function_call_collection()
 
-
-
-        #cli.start(func_call, func_call.pa, args.target, args.rule, a_sid=task_id)
+        # scan
+        origin_vulns = scan(func_call, target_directory=target_directory, special_rules=pa.special_rules, files=files)
 
         t2 = time.time()
         logger.info('[INIT] Done! Consume Time:{ct}s'.format(ct=t2 - t1))

@@ -31,7 +31,7 @@ class CVI_10001():
 
         # 部分配置
         self.match_mode = "vustomize-match"
-        self.match = r"((echo|print)\s+.+;?(?=(\?>)|;))"
+        self.match = r"((echo|print)\s+[^;]+(?=(\?>)|;))"
 
         # for solidity
         self.match_name = None

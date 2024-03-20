@@ -4,7 +4,7 @@ import queue
 from utils.log import logger
 from phply import phpast as php
 from core.pretreatment import ast_object, gen_ast
-from utils.file import FileParse, check_comment
+from utils.file import FileParseAll, check_comment
 from Kunlun_M.const import BUILTIN_FUNC
 
 NEWLINE_FLAGS = ["<?php", "{", "}", ";"]
@@ -103,7 +103,7 @@ class FuncCall:
     self.call_graph:list+
     """
 
-    def __init__(self, target_directory, files, file_count, special_rules, a_sid=None):
+    def __init__(self, target_directory, files):
         # output
         self.function_list = []
         self.call_list = []
@@ -111,16 +111,13 @@ class FuncCall:
         # input
         self.target_directory = target_directory
         self.files = files
-        self.file_count = file_count
-        self.special_rules = special_rules
-        self.aid = a_sid
 
         # processing
         self.__file_process()
 
     def __file_process(self):
         self.file_list = []
-        self.pfa = FileParse(self.files, self.target_directory)
+        self.pfa = FileParseAll(self.files, self.target_directory)
         for file in self.pfa.t_filelist:
             fi = FileInfo(file, self.target_directory)
             self.file_list.append(fi)
@@ -168,8 +165,8 @@ class FuncCall:
             # compare expr
             if isinstance(node, php.If) or isinstance(node, php.ElseIf) \
                     or isinstance(node, php.DoWhile) or isinstance(node, php.Foreach) or isinstance(node, php.While) \
-                    or isinstance(node, php.Switch) or isinstance(node, php.Case) or isinstance(node, php.Block):
-                self.single_line_call_collect(node, father_list, newlineno, file, stmt_type="expr")
+                    or isinstance(node, php.Switch) or isinstance(node, php.Case):
+                self.single_line_call_collect(node.expr, father_list, newlineno, file, stmt_type="expr")
                 is_recursion = True
 
             # assignment expr
@@ -186,6 +183,9 @@ class FuncCall:
             elif isinstance(node, php.FunctionCall) or isinstance(node, php.MethodCall) or isinstance(node,
                                                                                                       php.StaticMethodCall):
                 self.single_line_call_collect(node, father_list, newlineno, file, stmt_type="call")
+                is_recursion = True
+
+            elif isinstance(node, php.Block):
                 is_recursion = True
 
             # Scope zone
@@ -289,7 +289,7 @@ class FuncCall:
 
 
 
-    def func_match(self, node, type, father_list, file, class_name=None):
+    def func_match(self, node, type, father_list, file, class_name=None, class_=None):
         """
         match functionCall with function in self.function_list
         """
@@ -315,24 +315,23 @@ class FuncCall:
                                                                                                        0].func_name))
             result_func = None
             for func in same_name_func:
-                if len(father_list) == len(func.father_list):
-                    match = True
-                    for i in range(len(father_list)):
-                        if father_list[i]["name"] != func.father_list[i]["name"] or father_list[i]["type"] != \
-                                func.father_list[i]["type"]:
-                            match = False
-                            break
-                    if not match:
-                        if class_name == "parent":
-                            result_func = func
-                            break
-                    if match:
-                        result_func = func
-                        break
-
                 if result_func == None:
                     result_func = func
                     continue
+
+                match = True
+                for i in range(min(len(father_list), len(func.father_list))):
+                    if father_list[i]["name"] != func.father_list[i]["name"] or father_list[i]["type"] != \
+                            func.father_list[i]["type"]:
+                        match = False
+                        break
+                if not match:
+                    if class_name == "parent":
+                        result_func = func
+                        break
+                elif match:
+                    result_func = func
+                    break
 
                 if len(result_func.father_list) > len(func.father_list):
                     result_func = func

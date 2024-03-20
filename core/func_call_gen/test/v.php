@@ -10,6 +10,7 @@ class a{
 
                 }
                 $test = null;
+                $this->a_meth1();
                 //print($taint);
                 if($test){
                     $taint = $_GET['test'];
