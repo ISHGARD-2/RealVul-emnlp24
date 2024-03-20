@@ -33,52 +33,6 @@ def file_list_parse(filelist, language=None):
 
     return result
 
-
-def un_zip(target_path):
-    """
-    解压缩目标压缩包
-    实现新需求，解压缩后相应的js文件做代码格式化
-    :return:
-    """
-
-    logger.info("[Pre][Unzip] Upzip file {}...".format(target_path))
-
-    if not os.path.isfile(target_path):
-        logger.warn("[Pre][Unzip] Target file {} is't exist...pass".format(target_path))
-        return False
-
-    zip_file = zipfile.ZipFile(target_path)
-    target_file_path = target_path + "_files/"
-
-    if os.path.isdir(target_file_path):
-        logger.debug("[Pre][Unzip] Target files {} is exist...continue".format(target_file_path))
-        return target_file_path
-    else:
-        os.mkdir(target_file_path)
-
-    for names in zip_file.namelist():
-        zip_file.extract(names, target_file_path)
-
-        # 对其中部分文件中为js的时候，将js代码格式化便于阅读
-        if names.endswith(".js"):
-            file_path = os.path.join(target_file_path, names)
-            file = codecs.open(file_path, 'r+', encoding='utf-8', errors='ignore')
-            file_content = file.read()
-            file.close()
-
-            new_file = codecs.open(file_path, 'w+', encoding='utf-8', errors='ignore')
-
-            opts = jsbeautifier.default_options()
-            opts.indent_size = 2
-
-            new_file.write(jsbeautifier.beautify(file_content, opts))
-            new_file.close()
-
-    zip_file.close()
-
-    return target_file_path
-
-
 def check_filepath(target, filepath):
     os.chdir(os.path.dirname(os.path.dirname(__file__)))
 
@@ -217,7 +171,6 @@ class FileParseAll:
                         data = m.group(0).strip()
 
                         split_data = content.split(data)[0]
-                        # enddata = content.split(data)[1]
 
                         LRnumber = " ".join(split_data).count('\n')
 
@@ -229,6 +182,9 @@ class FileParseAll:
 
 
 class Directory(object):
+    """
+        :return {'.php': {'count': 2, 'list': ['/path/a.php', '/path/b.php']}}, file_sum, time_consume
+    """
     def __init__(self, absolute_path, lans=None):
         self.file_sum = 0
         self.type_nums = {}
@@ -239,10 +195,6 @@ class Directory(object):
 
 
         self.ext_list = [ext_dict['php']]
-
-    """
-    :return {'.php': {'count': 2, 'list': ['/path/a.php', '/path/b.php']}}, file_sum, time_consume
-    """
 
     def collect_files(self):
         t1 = time.time()

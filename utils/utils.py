@@ -12,7 +12,6 @@ import zipfile
 from configs.settings import RULES_PATH
 
 from utils.log import logger
-from utils.file import un_zip
 
 TARGET_MODE_FILE = 'file'
 TARGET_MODE_FOLDER = 'folder'
@@ -96,19 +95,6 @@ class ParseArgs(object):
             target_directory = self.target
         elif target_mode == TARGET_MODE_FILE:
             target_directory = self.target
-
-            # 检查目标是否为zip
-            if os.path.splitext(target_directory)[-1] == '.zip':
-                try:
-                    logger.info("[CLI] Target {} is zip, try to unzip.".format(target_directory))
-                    target_directory = un_zip(target_directory)
-
-                except zipfile.BadZipFile:
-                    logger.warning("[CLI] file {} not zip".format(target_directory))
-
-                except OSError:
-                    logger.warning("[CLI] file {} unzip error".format(target_directory))
-
             return target_directory
         else:
             logger.critical('[PARSE-ARGS] exception target mode ({mode})'.format(mode=target_mode))

@@ -1,21 +1,5 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
-"""
-    core
-    ~~~~~
-
-    Implements core main
-
-    :author:    Feei <feei@feei.cn>
-    :homepage:  https://github.com/wufeifei/cobra
-    :license:   MIT, see LICENSE for more details.
-    :copyright: Copyright (c) 2017 Feei. All rights reserved
-"""
-import os
 import sys
 import time
-import argparse
 import logging
 import traceback
 
@@ -26,7 +10,7 @@ from utils.log import log, logger
 from utils.utils import ParseArgs
 
 from core.preprocess.func_call import FuncCall
-from .engine import scan
+from core.preprocess.engine import scan
 
 
 def args_prepare(args):

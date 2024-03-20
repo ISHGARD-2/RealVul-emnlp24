@@ -3,11 +3,9 @@ import codecs
 import queue
 from utils.log import logger
 from phply import phpast as php
-from core.pretreatment import ast_object, gen_ast
+from core.preprocess.pretreatment import ast_object
 from utils.file import FileParseAll, check_comment
 from configs.const import BUILTIN_FUNC
-
-NEWLINE_FLAGS = ["<?php", "{", "}", ";"]
 
 
 class PhpRootNode:

@@ -4,10 +4,6 @@ import logging
 import colorlog
 from configs.settings import LOGS_PATH
 
-# stream handle
-#
-# Copyright (C) 2010-2012 Vinay Sajip. All rights reserved. Licensed under the new BSD license.
-#
 logger = logging.getLogger('ISHGARD')
 logger_console = logging.getLogger('ISHGARDConsoleLog')
 log_path = LOGS_PATH
