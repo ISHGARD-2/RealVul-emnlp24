@@ -14,7 +14,7 @@
 import os
 import logging
 import colorlog
-from Kunlun_M.settings import LOGS_PATH
+from configs.settings import LOGS_PATH
 
 # stream handle
 #
@@ -29,13 +29,13 @@ def log(loglevel):
     if os.path.isdir(log_path) is not True:
         os.mkdir(log_path, 0o755)
 
+
     log_name = 'main'
     logfile = os.path.join(log_path, log_name + '.log')
 
     handler = colorlog.StreamHandler()
     handler.setFormatter(
         colorlog.ColoredFormatter(
-            # fmt='%(log_color)s [%(asctime)s][%(filename)s:%(lineno)d] %(message)s',
             fmt='%(log_color)s [%(asctime)s] %(message)s',
             datefmt="%H:%M:%S",
             log_colors={
@@ -55,29 +55,8 @@ def log(loglevel):
     logger.addHandler(handler2)
     logger.addHandler(handler)
 
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(loglevel)
 
-
-def log_add(loglevel, log_name):
-    if os.path.isdir(log_path) is not True:
-        os.mkdir(log_path, 0o755)
-
-    # rm old handler
-    mainlogfile = os.path.join(log_path, 'main.log')
-    f = open(mainlogfile, 'a+')
-    handler = logging.StreamHandler(f)
-    logger.removeHandler(handler)
-
-    # new handler
-    logfile = os.path.join(log_path, log_name + '.log')
-    f2 = open(logfile, 'a+')
-    handler2 = logging.StreamHandler(f2)
-    formatter = logging.Formatter(
-        "[%(levelname)s][%(threadName)s][%(asctime)s][%(filename)s:%(lineno)d] %(message)s")
-    handler2.setFormatter(formatter)
-    logger.addHandler(handler2)
-
-    logger.setLevel(logging.DEBUG)
 
 
 def log_console():
@@ -98,18 +77,5 @@ def log_console():
     logger_console.addHandler(handler)
 
     logger_console.setLevel(logging.DEBUG)
-
-
-def log_rm():
-    for handler in logger.handlers:
-        if handler.__str__() == colorlog.StreamHandler().__str__():
-            logger.removeHandler(handler)
-
-    for handler in logger_console.handlers:
-        if handler.__str__() == colorlog.StreamHandler().__str__():
-            logger_console.removeHandler(handler)
-
-    logger_console.setLevel(logging.ERROR)
-
 
 log_console()

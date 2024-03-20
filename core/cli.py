@@ -22,7 +22,7 @@
 # from utils.utils import ParseArgs, get_sid
 # from utils.utils import md5, random_generator
 # from core.vendors import get_project_by_version
-# from Kunlun_M.const import VUL_LEVEL, VENDOR_VUL_LEVEL
+# from configs.const import VUL_LEVEL, VENDOR_VUL_LEVEL
 #
 # from web.index.models import ScanTask, Rules, NewEvilFunc, VendorVulns
 # from web.index.models import get_resultflow_class, get_and_check_scantask_project_id, check_and_new_project_id, get_and_check_scanresult

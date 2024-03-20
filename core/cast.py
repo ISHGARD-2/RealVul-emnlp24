@@ -25,7 +25,6 @@ class CAST(object):
         self.param_value = None
         self.language = None
         self.sr = rule_class
-        self.controlled_list = controlled_params
 
         for language in self.languages:
             if self.file_path[-len(language):].lower() == language:
@@ -58,41 +57,11 @@ class CAST(object):
 
         if params is None:
             logger.debug("[AST] Not matching variables...")
-            return False, -1, self.data, []
 
         for param_name in params:
-            try:
-                self.param_name = param_name
-                logger.debug('[AST] Param: `{0}`'.format(param_name))
+            self.param_name = param_name
+            logger.debug('[AST] Param: `{0}`'.format(param_name))
 
-                # all is string
-                regex_string = self.regex[self.language]['string']
-                string = re.findall(regex_string, param_name)
-                if len(string) >= 1 and string[0] != '':
-                    regex_get_variable_result = re.findall(self.regex[self.language]['variable'], param_name)
-                    len_regex_get_variable_result = len(regex_get_variable_result)
-                    if len_regex_get_variable_result >= 1:
-                        # TODO
-                        # 'ping $v1 $v2'
-                        # foreach $vn
-                        param_name = regex_get_variable_result[0]
-                        logger.info("[AST] String's variables: `{variables}`".format(
-                            variables=','.join(regex_get_variable_result)))
-                    else:
-                        logger.debug("[AST] String have variables: `No`")
-                        return False, -1, self.data, []
-                logger.debug("[AST] String have variables: `Yes`")
-            except KeyboardInterrupt as e:
-                raise
-            except:
-                logger.warning(
-                    "[AST] Can't get `param`, check built-in rule..error details:\n{}".format(traceback.format_exc()))
-                return False, -1, self.data, []
-
-
-        # variable
-
-
-        return False, self.data, None, None
+        return params
 
 

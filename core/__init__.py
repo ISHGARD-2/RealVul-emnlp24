@@ -26,7 +26,7 @@ from utils.log import log, logger
 from utils.utils import ParseArgs
 
 from . import cli
-from core.func_call_gen.func_call import FuncCall
+from core.preprocess.func_call import FuncCall
 from .engine import scan
 
 
@@ -68,7 +68,7 @@ def main():
         t1 = time.time()
 
         # log
-        log(logging.INFO)
+        log(logging.DEBUG)
         logger.debug('[INIT] set logging level: {}'.format(logging.getLogger().level))
 
         # args

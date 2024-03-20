@@ -12,13 +12,10 @@
     :copyright: Copyright (c) 2017 LoRexxar. All rights reserved
 """
 import os
-import inspect
-import codecs
 import logging
-from Kunlun_M.settings import RULES_PATH
+from settings.settings import RULES_PATH
 
 from utils.log import logger
-from utils.utils import file_output_format
 
 
 
@@ -51,9 +48,8 @@ def block(index):
 
 
 class Rule(object):
-    def __init__(self, lans=[]):
-        origin_lans = []
-        origin_lans.extend(lans)
+    def __init__(self):
+        origin_lans = ["php"]
 
         self.rule_dict = {}
 

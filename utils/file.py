@@ -1,16 +1,5 @@
 # -*- coding: utf-8 -*-
 
-"""
-    file
-    ~~~~~~
-
-    readfile by open/read for windows
-
-    :author:    LoRexxar
-    :homepage:  https://github.com/LoRexxar/Kunlun-M
-    :license:   MIT, see LICENSE for more details.
-    :copyright: Copyright (c) 2017 Feei. All rights reserved
-"""
 
 import re
 import os
@@ -21,8 +10,7 @@ import zipfile
 import traceback
 import jsbeautifier
 from utils.log import logger
-from Kunlun_M.const import ext_dict, default_black_list, IGNORE_LIST
-from Kunlun_M.settings import IGNORE_PATH
+from configs.const import ext_dict
 
 
 ext_list = []
@@ -212,20 +200,6 @@ def check_filepath(target, filepath):
 #
 #     return True
 
-
-def check_kunlunignore(filename):
-
-    is_not_ignore = True
-
-    for ignore_reg in IGNORE_LIST:
-
-        # ignore_reg_obj = re.match(ignore_reg, filename, re.I)
-
-        if re.search(ignore_reg, filename, re.I):
-            logger.debug('[INIT][IGNORE] File {} filter by {}'.format(filename, ignore_reg))
-            return False
-
-    return True
 
 
 def check_comment(content):
@@ -618,17 +592,14 @@ class FileParseAll:
 
 
 class Directory(object):
-    def __init__(self, absolute_path, black_path_list=None, lans=None):
-        black_path_list = black_path_list or []
+    def __init__(self, absolute_path, lans=None):
         self.file_sum = 0
         self.type_nums = {}
         self.result = {}
         self.file = []
 
         self.absolute_path = absolute_path
-        self.black_path_list = default_black_list
 
-        self.black_path_list.extend(black_path_list)
 
         self.ext_list = [ext_dict['php']]
 
@@ -676,16 +647,6 @@ class Directory(object):
             else:
                 for filename in os.listdir(absolute_path):
                     directory = os.path.join(absolute_path, filename)
-
-                    flag = 0
-
-                    # check black path list
-                    # if self.black_path_list:
-                    #     for black_path in self.black_path_list:
-                    #         if black_path in filename:
-                    #             flag = 1
-                    if not check_kunlunignore(directory):
-                        continue
 
                     # Directory Structure
                     logger.debug('[PICKUP] [FILES] ' + '|  ' * (level - 1) + '|--' + filename)

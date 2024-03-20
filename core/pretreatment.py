@@ -6,7 +6,7 @@ from phply import phpast as php
 from utils.file import check_comment
 
 from utils.log import logger
-from Kunlun_M.const import ext_dict
+from settings.const import ext_dict
 
 import gc
 import os

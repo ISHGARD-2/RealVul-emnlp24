@@ -1,9 +1,0 @@
-# for crx
-.crx_files
-
-# path
-/vendor/
-/.idea/
-/static/
-
-# !/tests/

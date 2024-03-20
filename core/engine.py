@@ -6,9 +6,7 @@ import asyncio
 import traceback
 
 from .rule import Rule
-from .cast import CAST
 
-from Kunlun_M import const
 from utils.file import FileParseAll
 from utils.log import logger
 
@@ -23,7 +21,7 @@ def scan_single(func_call, target_directory, single_rule, files=None, is_unconfi
 
 
 def scan(func_call, target_directory, special_rules=None, files=None, is_unconfirm=False):
-    r = Rule("php")
+    r = Rule()
     rules = r.rules(special_rules)
 
     find_vulnerabilities = []
@@ -216,24 +214,18 @@ class SingleRule(object):
         logger.debug('[ENGINE] [ORIGIN] match-mode {m}'.format(m=self.sr.match_mode))
 
         # grep
-        if self.sr.match_mode == const.mm_regex_param_controllable:
-            # 自定义匹配，调用脚本中的匹配函数匹配参数
-            match = self.sr.match
+        match = self.sr.match
 
-            try:
-                if match:
-                    f = FileParseAll(self.files, self.target_directory, language=self.lan)
-                    result = f.grep(match)
-                else:
-                    result = None
-            except Exception as e:
-                traceback.print_exc()
-                logger.debug('match exception ({e})'.format(e=e))
-                return None
-
-        else:
-            logger.warning('Exception match mode: {m}'.format(m=self.sr.match_mode))
-            result = None
+        try:
+            if match:
+                f = FileParseAll(self.files, self.target_directory, language=self.lan)
+                result = f.grep(match)
+            else:
+                result = None
+        except Exception as e:
+            traceback.print_exc()
+            logger.debug('match exception ({e})'.format(e=e))
+            return None
 
         try:
             result = result.decode('utf-8')
@@ -361,17 +353,29 @@ class Core(object):
             logger.debug("[RET] Annotation")
             return False, 'Annotation(注释)'
 
-        try:
+        params = self.is_controllable_param()
 
-            # organize information about vulnerability
-            ast = CAST(self.func_call, self.rule_match, self.target_directory, self.file_path, self.line_number,
-                       self.code_content, files=self.files, rule_class=self.single_rule, controlled_params=self.controlled_list)
+        # program slicing
 
-            # vustomize-match
-            param_is_controllable, code, data, chain = ast.is_controllable_param()
 
-        except Exception as e:
-            logger.debug(traceback.format_exc())
-            return False, 'Exception'
+
+
+    def is_controllable_param(self):
+        """
+        is controllable param
+        :return:
+        """
+        params = None
+        if self.single_rule is not None:
+            params = self.single_rule.main(self.code_content)
+
+        if params is None:
+            logger.debug("[AST] Not matching variables...")
+
+        for param_name in params:
+            self.param_name = param_name
+            logger.debug('[AST] Param: `{0}`'.format(param_name))
+
+        return params
 
 

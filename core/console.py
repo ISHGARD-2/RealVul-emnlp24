@@ -30,9 +30,9 @@
 # from utils.utils import get_mainstr_from_filename, file_output_format, show_context
 # from utils.status import get_scan_id
 #
-# from Kunlun_M.settings import HISTORY_FILE_PATH, MAX_HISTORY_LENGTH
-# from Kunlun_M.settings import RULES_PATH, PROJECT_DIRECTORY, LOGS_PATH
-# from Kunlun_M.const import VUL_LEVEL
+# from configs.settings import HISTORY_FILE_PATH, MAX_HISTORY_LENGTH
+# from configs.settings import RULES_PATH, PROJECT_DIRECTORY, LOGS_PATH
+# from configs.const import VUL_LEVEL
 #
 # from core.__version__ import __introduction__
 # from core import cli
