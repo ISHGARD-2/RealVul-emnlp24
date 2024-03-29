@@ -8,33 +8,33 @@ from .rule import Rule
 
 from utils.file import FileParseAll
 from utils.log import logger
+from .slicing import Slicing
 
 
-def scan_single(func_call, target_directory, single_rule, files=None, is_unconfirm=False,
-                newcore_function_list=[]):
+def scan_single(func_call, target_directory, single_rule, mode, files=None, is_unconfirm=False):
     try:
-        return SingleRule(func_call, target_directory, single_rule, files, is_unconfirm,
-                          newcore_function_list).process()
+        return SingleRule(func_call, target_directory, single_rule, mode, files, is_unconfirm).process()
     except Exception:
         raise
 
 
-def scan(func_call, target_directory, special_rules=None, files=None, is_unconfirm=False):
+def scan(func_call, target_directory, special_rules=None, files=None, mode="test"):
     r = Rule()
     rules = r.rules(special_rules)
 
     find_vulnerabilities = []
 
     def store(result):
-        if result is not None and isinstance(result, list) is True:
-            for res in result:
-                res.file_path = res.file_path
-                find_vulnerabilities.append(res)
-        else:
-            logger.debug('[SCAN] [STORE] Not found vulnerabilities on this rule!')
+        # if result is not None and isinstance(result, list) is True:
+        #     for res in result:
+        #         res.file_path = res.file_path
+        #         find_vulnerabilities.append(res)
+        # else:
+        #     logger.debug('[SCAN] [STORE] Not found vulnerabilities on this rule!')
+        return
 
     async def start_scan(func_call, target_directory, rule, files):
-        result = scan_single(func_call, target_directory, rule, files, is_unconfirm)
+        result = scan_single(func_call, target_directory, rule, mode, files)
         store(result)
 
     if len(rules) == 0:
@@ -73,19 +73,16 @@ def scan(func_call, target_directory, special_rules=None, files=None, is_unconfi
 
 
 class SingleRule(object):
-    def __init__(self, func_call, target_directory, single_rule, files, is_unconfirm=False,
-                 newcore_function_list=[]):
+    def __init__(self, func_call, target_directory, single_rule, mode, files, is_unconfirm=False):
         self.func_call = func_call
         self.target_directory = target_directory
         self.sr = single_rule
         self.files = files
+        self.mode = mode
         self.lan = self.sr.language.lower()
         self.is_unconfirm = is_unconfirm
         # Single Rule Vulnerabilities
-        self.rule_vulnerabilities = []
-
-        # new core function list
-        self.newcore_function_list = newcore_function_list
+        self.vulnerability_data = []
 
         logger.info("[!] Start scan [CVI-{sr_id}]".format(sr_id=self.sr.svid))
 
@@ -126,27 +123,21 @@ class SingleRule(object):
 
         origin_vulnerabilities = origin_results
         for index, origin_vulnerability in enumerate(origin_vulnerabilities):
-            logger.debug(
-                '[CVI-{cvi}] [ORIGIN] {line}'.format(cvi=self.sr.svid, line=": ".join(list(origin_vulnerability))))
             if origin_vulnerability == ():
                 logger.debug(' > continue...')
                 continue
 
             if origin_vulnerability[0] and origin_vulnerability[1] and origin_vulnerability[2]:
-                try:
-                    core = Core(self.func_call, self.target_directory, origin_vulnerability, self.sr, files=self.files, is_unconfirm=self.is_unconfirm)
-                    datas = core.scan()
+                core = Core(self.func_call, self.target_directory, origin_vulnerability, self.sr)
+                vul_slice = core.scan(self.mode)
+                if vul_slice:
+                    self.vulnerability_data.append(vul_slice)
 
-                    return [core, datas]
-
-                except Exception:
-                    raise
-        return None
+        return
 
 
 class Core(object):
-    def __init__(self, func_call, target_directory, vulnerability_result, single_rule,
-                 index=0, files=None, is_unconfirm=False):
+    def __init__(self, func_call, target_directory, vulnerability_result, single_rule):
         """
         Initialize
         :param: target_directory:
@@ -156,68 +147,18 @@ class Core(object):
         :param files: core file list
         """
         self.func_call = func_call
-        self.data = []
-        self.controlled_list = []
 
         self.target_directory = os.path.normpath(target_directory)
 
         self.file_path = vulnerability_result[0].strip()
+        self.file_path = self.file_path[self.file_path.find('/')+1:]
         self.line_number = vulnerability_result[1]
         self.code_content = vulnerability_result[2]
 
-        self.files = files
-
-        self.rule_match = single_rule.match
-        self.rule_match_mode = single_rule.match_mode
-        self.vul_function = single_rule.vul_function
-        self.cvi = single_rule.svid
-        self.lan = single_rule.language.lower()
         self.single_rule = single_rule
-        self.is_unconfirm = is_unconfirm
 
 
-        self.method = None
-        logger.debug("""[CVI-{cvi}] [VERIFY-VULNERABILITY] ({index})
-        > File: `{file}:{line}`
-        > Code: `{code}`""".format(
-            cvi=single_rule.svid,
-            index=index,
-            file=self.file_path,
-            line=self.line_number,
-            code=self.code_content))
-
-    def is_match_only_rule(self):
-        """
-        Whether only match the rules, do not parameter controllable processing
-        :method: It is determined by judging whether the left and right sides of the regex_location are brackets
-        :return: boolean
-        """
-        if self.rule_match_mode == 'regex-only-match':
-            return True
-        else:
-            return False
-
-    def is_annotation(self):
-        """
-        Is annotation
-        :method: Judgment by matching comment symbols (skipped when self.is_match_only_rule condition is met)
-               - PHP:  `#` `//` `\*` `*`
-                    //asdfasdf
-                    \*asdfasdf
-                    #asdfasdf
-                    *asdfasdf
-               - Java:
-        :return: boolean
-        """
-        match_result = re.findall(r"^(#|\\\*|\/\/)+", self.code_content)
-        # Skip detection only on match
-        if self.is_match_only_rule():
-            return False
-        else:
-            return len(match_result) > 0
-
-
-    def scan(self):
+    def scan(self, mode):
         """
         Scan vulnerabilities
         :flow:
@@ -228,18 +169,29 @@ class Core(object):
         - rule
         :return: is_vulnerability, code
         """
-        if self.is_annotation():
-            logger.debug("[RET] Annotation")
-            return False, 'Annotation(注释)'
 
-        params = self.is_controllable_param()
+        params = self.get_stmt_param()
+
+        if not params:
+            return None
 
         # program slicing
+        logger.debug("{line1}[CVI-{cvi}][SLICING]{line2}".format(cvi=self.single_rule.svid, line1='-'*30, line2='-'*30))
+        logger.debug("""[CVI-{cvi}][SLICING] > File: `{file}:{line}` > Code: `{code}`""".format(
+            cvi=self.single_rule.svid, file=self.file_path,
+            line=self.line_number, code=self.code_content))
+        for param_name in params:
+            logger.debug('[AST] Param: `{0}`'.format(param_name))
+
+        slice = Slicing(params, self.func_call, self.target_directory, self.file_path, self.code_content, self.line_number, self.single_rule)
+        vul_slice = slice.main(mode)
+        vul_slice += self.single_rule.complete_slice_end(self.code_content)
+        logger.debug("[CVI-{cvi}] [SLICING] reslut: \n{vul_slice}\n".format(cvi=self.single_rule.svid,vul_slice=vul_slice))
+        return vul_slice
 
 
 
-
-    def is_controllable_param(self):
+    def get_stmt_param(self):
         """
         is controllable param
         :return:
@@ -250,10 +202,6 @@ class Core(object):
 
         if params is None:
             logger.debug("[AST] Not matching variables...")
-
-        for param_name in params:
-            self.param_name = param_name
-            logger.debug('[AST] Param: `{0}`'.format(param_name))
 
         return params
 

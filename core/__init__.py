@@ -35,6 +35,7 @@ def args_format():
     parser = argparse.ArgumentParser()
     parser.add_argument('-t', '--target', dest='target', type=str, default='', help="target file")
     parser.add_argument('-r', '--rule', dest='rule', type=str, default=None, help="vulnerability rule")
+    parser.add_argument('-m', '--mode', dest='mode', type=str, default="test", help="vulnerability rule")
     args = parser.parse_args()
 
     if not hasattr(args, "target") or args.target == '':
@@ -59,13 +60,15 @@ def main():
 
         # prepare args
         pa, target_directory, files = args_prepare(args)
+        mode = args.mode
 
         # generate function call relationship
         func_call = FuncCall(target_directory, files)
-        func_call.function_call_collection()
+        func_call.main()
 
         # scan
-        origin_vulns = scan(func_call, target_directory=target_directory, special_rules=pa.special_rules, files=files)
+
+        origin_vulns = scan(func_call, target_directory=target_directory, special_rules=pa.special_rules, files=files, mode=mode)
 
         t2 = time.time()
         logger.info('[INIT] Done! Consume Time:{ct}s'.format(ct=t2 - t1))

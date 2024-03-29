@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import re
 
 class CVI_10001():
     """
@@ -10,7 +10,6 @@ class CVI_10001():
 
         self.svid = 10001
         self.language = "php"
-        self.author = "LoRexxar"
         self.vulnerability = "Reflected XSS"
         self.description = "echo参数可控会导致XSS漏洞"
         self.level = 4
@@ -22,17 +21,6 @@ class CVI_10001():
         self.match_mode = "vustomize-match"
         self.match = r"((echo|print)\s+[^;]+(?=(\?>)|;))"
 
-        # for solidity
-        self.match_name = None
-        self.black_list = None
-
-        # for chrome ext
-        self.keyword = None
-
-        # for regex
-        self.unmatch = None
-
-        self.vul_function = None
 
     def main(self, regex_string):
         """
@@ -47,3 +35,13 @@ class CVI_10001():
             match = p.findall(regex_string)
             return match
         return None
+
+    def get_content(self, code):
+        if code[:4] == "echo":
+            return code[5:]
+        elif code[:5] == "print":
+            return code[6:]
+
+    def complete_slice_end(self, code):
+        code = self.get_content(code)
+        return "$vulchecker_output = " + str(code)

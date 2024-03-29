@@ -45,7 +45,41 @@ def check_filepath(target, filepath):
     else:
         return False
 
+
+def check_html(content, remove_php=True):
+    clear_str = ""
+    end_pos = content.find("?>")
+    if end_pos < 0:
+        return content
+
+    while end_pos >= 0:
+        if remove_php:
+            # len of '<?php' and '?>'
+            start_len = 5
+            end_len = 0
+        else:
+            start_len = 0
+            end_len = 2
+        clear_str += content[:end_pos+end_len]
+        content = content[end_pos+2:]
+
+        start_pos = content.find("<?php")
+        if start_pos >= 0:
+            html_code = content[:start_pos]
+            content = content[start_pos+start_len:]
+
+            for char in html_code:
+                if char in ['\n', '\t', ' ']:
+                    clear_str += char
+            if html_code.count('\n') == 0:
+                clear_str += '\n'
+
+        end_pos = content.find("?>")
+    return clear_str
+
 def check_comment(content):
+    content = check_html(content)
+
     backstr = ""
     lastchar = ""
     isinlinecomment = False

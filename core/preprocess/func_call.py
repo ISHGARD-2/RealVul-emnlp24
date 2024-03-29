@@ -14,6 +14,34 @@ class PhpRootNode:
         self.nodes = nodes
 
 
+class Flow:
+    """
+    "name": "if",
+    "subnode": [],
+    "lineno": node.lineno,
+    "flag":0
+    """
+    def __init__(self, name, subnode, lineno):
+        self.name = name
+        self.subnode = subnode
+        self.lineno = lineno
+        self.flag = 0
+        self.code = ""
+
+    def set_code(self, code):
+        self.code = code
+
+    def set_flag(self):
+        self.flag = 1
+
+    def clear_flag(self):
+        self.flag=0
+        self.code = ""
+        if self.subnode.__class__.__name__ == 'list':
+            for flow in self.subnode:
+                flow.clear_flag()
+
+
 class FunctionInfo:
     """
     func_name:str
@@ -22,6 +50,7 @@ class FunctionInfo:
     node_ast:ast
     code:str
     file:str
+    callers : []
     """
 
     def __init__(self, func_name, func_type, father_list, node_ast, code, file):
@@ -31,6 +60,21 @@ class FunctionInfo:
         self.node_ast = node_ast
         self.code = code
         self.file = file
+        self.callers = []
+
+        # process
+        self.code_split = code.split('\n')
+
+    def set_lineno(self, start_lineno, end_lineno, code_lineno):
+        self.start_lineno = start_lineno
+        self.end_lineno = end_lineno
+        self.code_lineno = code_lineno
+
+    def set_callers(self, caller):
+        self.callers.append(caller)
+
+    def set_control_flow(self, flow):
+        self.control_flow = flow
 
 
 class FileInfo:
@@ -123,8 +167,9 @@ class FuncCall:
         ast_object.init_pre(self.target_directory, self.files)
         ast_object.pre_ast_all("php", is_unprecom=False)
 
-    def function_call_collection(self, analysis_mode="test"):
+    def main(self, analysis_mode="test"):
         """
+        function call collection
         analysis_mode:train or test
         """
 
@@ -142,7 +187,68 @@ class FuncCall:
             nodes = ast_object.get_nodes(file.file_path)
             self.analysis_call(nodes, [{"name": 'root', "type": None}], file)
 
+        # save caller to function
+        self.gen_call_graph()
+
+        # control flow of every function
+        for func in self.function_list:
+            base_flow = Flow("base", [], func.start_lineno)
+            func.set_control_flow(self.control_flow_analysis(func.node_ast.nodes, base_flow))
+
         return
+
+
+    def control_flow_analysis(self, nodes, base_flow):
+
+        for i, node in enumerate(nodes):
+            if isinstance(node, php.If):
+                if_flow = Flow("if", [], node.lineno)
+                block_flow = Flow("block", [], node.lineno+1)
+                block_flow = self.control_flow_analysis(node.node.nodes, block_flow)
+                if_flow.subnode.append(block_flow)
+
+                for eif in node.elseifs:
+                    elseif_flow = Flow("elseif", [], eif.lineno)
+                    elseif_flow = self.control_flow_analysis(eif, elseif_flow)
+                    if_flow.subnode.append(elseif_flow)
+
+                if node.else_:
+                    else_flow = Flow("else", [], node.else_.lineno)
+
+                    if node.else_.node.__class__.__name__ == "If":
+                        else_flow = self.control_flow_analysis([node.else_.node], else_flow)
+                    else:
+                        if node.else_.node.__class__.__name__ == "Block":
+                            else_flow = self.control_flow_analysis(node.else_.node.nodes, else_flow)
+                    if_flow.subnode.append(else_flow)
+                base_flow.subnode.append(if_flow)
+
+            #elif isinstance(node, php.DoWhile):
+
+            #elif isinstance(node, php.Foreach):
+
+            elif isinstance(node, php.While):
+                while_flow = Flow("while", [], node.lineno)
+                while_flow = self.control_flow_analysis(node.node.nodes, while_flow)
+                base_flow.subnode.append(while_flow)
+
+            # elif isinstance(node, php.Switch):
+            #
+            # elif isinstance(node, php.Case):
+
+            else:
+                sub_flow = Flow("others", node, node.lineno)
+                base_flow.subnode.append(sub_flow)
+        return base_flow
+
+
+    def gen_call_graph(self):
+        for call_stmt in self.call_list:
+            for oc in call_stmt.callers:
+                for func in self.function_list:
+                    if func == oc.function:
+                        func.set_callers(call_stmt)
+
 
     def analysis_call(self, nodes, father_list, file, stmt_node=None):
         """
@@ -155,7 +261,7 @@ class FuncCall:
                 new_node_name = node.name
             else:
                 new_node_name = node.__class__.__name__
-            new_node_type = node.__class__
+            new_node_type = node.__class__.__name__
             newlineno = node.lineno
 
             is_recursion = False
@@ -209,8 +315,7 @@ class FuncCall:
                 if hasattr(node, "else_") and node.else_:
                     new_nodes = [node.else_.node]
                     self.analysis_call(new_nodes, new_father_list, file)
-                else:
-                    continue
+
         return
 
     def single_line_call_collect(self, node, father_list, lineno, file, stmt_type="expr"):
@@ -276,7 +381,7 @@ class FuncCall:
 
         # save statement with call
         if len(function_call_list_in_stmt):
-            statement = file.code_content[lineno]
+            statement = file.code_content[lineno - 1]
             ast = root_node
             func_location = father_list
             file_location = file
@@ -318,6 +423,7 @@ class FuncCall:
                     continue
 
                 match = True
+
                 for i in range(min(len(father_list), len(func.father_list))):
                     if father_list[i]["name"] != func.father_list[i]["name"] or father_list[i]["type"] != \
                             func.father_list[i]["type"]:
@@ -327,9 +433,12 @@ class FuncCall:
                     if class_name == "parent":
                         result_func = func
                         break
-                elif match:
-                    result_func = func
-                    break
+                if match:
+                    if class_name != "parent":
+                        result_func = func
+                        break
+                    else:
+                        continue
 
                 if len(result_func.father_list) > len(func.father_list):
                     result_func = func
@@ -384,22 +493,31 @@ class FuncCall:
         """
         new_nodes = []
         new_code = "\n".join(file.code_content[0:nodes[0].lineno - 1])
+        code_line = [i+1 for i in range(nodes[0].lineno -1)]
+        end_lineno = nodes[0].lineno -1
 
         for i, node in enumerate(nodes):
+            if i+1 == len(nodes):
+                next_lineno = len(file.code_content)
+            else:
+                next_lineno = nodes[i+1].lineno
             if isinstance(node, php.Class) or isinstance(node, php.Function) or isinstance(node, php.Method):
                 continue
 
             start_pos = node.lineno - 1
             if i + 1 == len(nodes):
-                end_pos = -1
+                new_code += "\n" + "\n".join(file.code_content[start_pos:])
             else:
                 end_pos = nodes[i + 1].lineno - 1
-            new_code += "\n" + "\n".join(file.code_content[start_pos:end_pos])
-
+                new_code += "\n" + "\n".join(file.code_content[start_pos:end_pos])
+            for l in range(node.lineno, next_lineno):
+                code_line.append(l)
+            end_lineno = len(file.code_content)
             new_nodes.append(node)
 
         # prepare root function/method information
         root_function_info = FunctionInfo("root", None, [], PhpRootNode(new_nodes), new_code, file.file_path)
+        root_function_info.set_lineno(1, end_lineno, code_line)
         file.function_list.append(root_function_info)
 
     def analysis_functions(self, nodes, father_list, file, isroot=False):
@@ -425,11 +543,13 @@ class FuncCall:
                     next_node = None
                     if i + 1 < len(nodes):
                         next_node = nodes[i + 1]
-                    node_code = self.get_func_code(node, next_node, file)
+
+                    node_code, start_line, end_lineno, code_line = self.get_func_code(node, next_node, file)
 
                     # prepare function/method information
                     function_info = FunctionInfo(new_node_name, new_node_type, father_list, node, node_code,
                                                  file.file_path)
+                    function_info.set_lineno(start_line, end_lineno, code_line)
                     file.function_list.append(function_info)
 
                 new_father_list = copy.deepcopy(father_list)
@@ -468,19 +588,25 @@ class FuncCall:
         func_code = '\n'.join(file.code_content[start_lineno:last_lineno])
 
         if next_node:
-            return func_code
+            code_line = [start_lineno + 1 + i for i in range(last_lineno - start_lineno)]
+            return func_code, start_lineno+1, last_lineno+1, code_line
 
         # last node
         stack_count = 1
         tem_code = func_code[func_code.find('{') + 1:]
         last_pos = func_code.find('{') + 1
         cal_count = 0
+        touch_end = False
+        code_line = []
         while stack_count != 0:
             if cal_count > 10:
                 logger.error("[ERROR] get_func_code(): iter error, code: {}".format(tem_code))
                 exit()
             left_pos = tem_code.find('{') + 1
             righ_pos = tem_code.find('}') + 1
+
+            if left_pos == 0:
+                touch_end = True
 
             if left_pos < righ_pos and left_pos != 0:
                 stack_count += 1
@@ -492,4 +618,10 @@ class FuncCall:
                 last_pos += righ_pos
 
         func_code = func_code[:last_pos]
-        return func_code
+        last_lineno = start_lineno
+        code_line = []
+        for i in range(len(func_code.split('\n'))):
+            last_lineno += 1
+            code_line.append(last_lineno)
+
+        return func_code, start_lineno+1, last_lineno, code_line
