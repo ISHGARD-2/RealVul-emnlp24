@@ -22,17 +22,22 @@ class CVI_10001():
         self.match = r"((echo|print)\s+[^;]+(?=(\?>)|;))"
 
 
-    def main(self, regex_string):
+    def main(self, regex_string, with_position=False):
         """
         regex string input
         :regex_string: regex match string
         :return:
         """
-        sql_sen = regex_string[0][0]
         reg = "\$\w+"
         if re.search(reg, regex_string, re.I):
             p = re.compile(reg)
             match = p.findall(regex_string)
+            if with_position:
+                matchs= re.finditer(reg, regex_string)
+                positions = []
+                for m in matchs:
+                    positions.append((m.start(), m.end()))
+                return [match, positions]
             return match
         return None
 

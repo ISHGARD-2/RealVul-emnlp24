@@ -1,4 +1,3 @@
-
 ext_dict = {
     "php": ['.php', '.php3', '.php4', '.php5', '.php7', '.pht', '.phs', '.phtml', '.inc'],
 }
@@ -18,3 +17,15 @@ REGEX = {
     'assign_out_input': r'({0}\s?=\s?.*\$_[GET|POST|REQUEST|SERVER|COOKIE]+(?:\[))'
 }
 
+INPUT_VARIABLES = [
+    '$_GET',
+    '$_POST',
+    '$_REQUEST',
+    '$_COOKIE',
+    '$_FILES',
+    '$HTTP_POST_FILES',
+    '$HTTP_COOKIE_VARS',
+    '$HTTP_REQUEST_VARS',
+    '$HTTP_POST_VARS',
+    '$HTTP_RAW_POST_DATA',
+    '$HTTP_GET_VARS']

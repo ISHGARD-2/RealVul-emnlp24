@@ -106,3 +106,29 @@ class ParseArgs(object):
             return target_directory
         else:
             return u'{t}/'.format(t=target_directory)
+
+
+def match_pair(str, left_str, right_str):
+    stack_count = 1
+    cal_count = 0
+    start_pos = str.find(left_str)
+    end_pos = str.find(left_str) + 1
+    str = str[end_pos:]
+
+    if start_pos == -1:
+        return None
+
+    ep = 0
+    for i, char in enumerate(str):
+        if char == left_str:
+            stack_count += 1
+        elif char == right_str:
+            stack_count -= 1
+            ep = i
+        if stack_count == 0:
+            break
+    if stack_count != 0:
+        return None
+
+    end_pos += ep
+    return [start_pos, end_pos]

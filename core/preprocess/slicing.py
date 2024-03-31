@@ -1,6 +1,7 @@
 from utils.log import logger
 import queue
 from phply import phpast as php
+from configs.const import INPUT_VARIABLES
 
 class OneSlice:
     """
@@ -43,16 +44,13 @@ class Slicing:
 
 
     def slice_func(self, func, mode):
-        global slice_flag, para_list
+        global code_slice_flag, para_list
         para_list = []
         new_para = self.params
-        code_split = func.code.split("\n")
-
-        slice_flag = [0 for i in range(len(code_split))]
-        slice = ""
 
         # control flow
         control_flow = func.control_flow
+        code_slice_flag = [0 for i in range(control_flow.all_code_position[-1]['position'][1])]
 
         while_count = 0
         while new_para:
@@ -61,21 +59,44 @@ class Slicing:
             while_count += 1
 
             para_list += new_para
-            origin_pos = self.origin_postion(func, new_para)
-            new_para = self.subnode_scan(func, control_flow, origin_pos, self.line_number)
-            control_flow.set_flag()
 
-        for i, s in enumerate(slice_flag):
-            if s == 1:
-                slice += code_split[i] + "\n"
+            origin_pos = self.origin_postion(func, new_para)
+            new_para = self.subnode_scan(func, control_flow, origin_pos)
+            pass
+
+        code_slice = self.get_slice_from_flow(control_flow, True)
 
         # find params of function, trans to further function
+        #...
 
         control_flow.clear_flag()
 
-        slice = self.clear_slice(slice)
+        code_slice = self.clear_slice(code_slice)
 
-        return slice
+        return code_slice
+
+    def get_slice_from_flow(self, flow, isroot=False):
+        global code_slice_flag
+        if not isroot and not flow.flag:
+            return
+
+        if not isroot:
+            for self_code_line in flow.self_code_position:
+                for i in range(self_code_line['position'][0], self_code_line['position'][1]):
+                    code_slice_flag[i] = 1
+
+        if flow.name != 'others':
+            for subflow in flow.subnode:
+                self.get_slice_from_flow(subflow)
+
+        if isroot:
+            code_slice = ''
+            for i, char in enumerate(flow.code):
+                if code_slice_flag[i]:
+                    code_slice += char
+
+            return code_slice
+        return
 
     def clear_slice(self, slice):
         slice_split = slice.split('\n')
@@ -93,82 +114,65 @@ class Slicing:
 
 
 
-    def subnode_scan(self, func, control_flow, origin_pos, end_line):
-        global slice_flag, para_list
-        new_param = []
-        start_line = control_flow.lineno
-        flag = control_flow.flag
+    def subnode_scan(self, func, control_flow, origin_pos):
+        global para_list
+        new_param = set()
         sub_flow = control_flow.subnode
 
-        # start to first node mark
-        if not flag:
-            for i, line in enumerate(func.code_lineno):
-                for lno in range(start_line, sub_flow[0].lineno):
-                    if lno == line and line < self.line_number:
-                        slice_flag[i] = 1
-            # last node to end mark
-            if end_line < self.line_number:
-                for i, line in enumerate(func.code_lineno):
-                    for lno in range(sub_flow[-1].lineno+1, end_line):
-                        if lno == line and line < self.line_number:
-                            slice_flag[i] = 1
-            control_flow.set_flag()
+        # self_check
+        all_sp = control_flow.all_code_position[0]['position'][0]
+        all_ep = control_flow.all_code_position[-1]['position'][1]
 
-        # subnode mark
-        for i, flow in enumerate(sub_flow):
-            start_lineno = flow.lineno
-            if i + 1 == len(sub_flow):
-                # last sub flow
-                end_lineno = end_line
-            else:
-                end_lineno = sub_flow[i + 1].lineno
+        for var in origin_pos:
+            var_sp = var['position'][0]
+            var_ep = var['position'][1]
+            if all_sp <= var_sp and var_ep <= all_ep:
+                # set_flag
+                control_flow.set_flag()
+                break
 
-            for p in origin_pos:
-                if p["lineno"] >= start_lineno and p["lineno"] < end_lineno:
+        # new params
+        if control_flow.flag:
+            params = self.single_rule.main(control_flow.self_code)
+            if params:
+                for p in params:
+                    if p not in para_list and p not in INPUT_VARIABLES:
+                        new_param.add(p)
 
-                    if flow.subnode.__class__.__name__ == 'list':
-                        # mark sub flow
-                        params = self.subnode_scan(func, flow, origin_pos, end_lineno)
-                        for p in params:
-                            if p not in para_list and p not in new_param:
-                                new_param.append(p)
-                    else:
-                        if flow.code == "":
-                            code = ""
-                            for line in range(start_lineno, end_lineno):
-                                for i, func_line in enumerate(func.code_lineno):
-                                    if line == func_line and line < self.line_number:
-                                        # check new param:
-                                        code += func.code_split[i]
 
-                                        # mark slice code lineno:
-                                        slice_flag[i] = 1
-                            flow.code = code
-                        else:
-                            code = flow.code
-                        params = self.single_rule.main(code)
+        #subnode mark
+        if control_flow.name != 'others':
+            for i, flow in enumerate(sub_flow):
+                if flow.lineno <= self.line_number:
+                    params = self.subnode_scan(func, flow, origin_pos)
+                    for p in params:
+                        if p not in para_list and p not in INPUT_VARIABLES:
+                            new_param.add(p)
 
-                        for p in params:
-                            if p not in para_list and p not in new_param:
-                                new_param.append(p)
-
-        return new_param
+        return list(new_param)
 
 
     def origin_postion(self, func, para_list):
         origin_postions = []
-        code_split = func.code_split
+        code_line = func.code_line
 
-        for i, line in enumerate(code_split):
-            for para in para_list:
-                if para in line:
-                    if i >= len(func.code_lineno):
-                        logger.error("[ERROR] params origin_postion(): func code_lineno match error")
-                        exit()
+        for i, line in enumerate(code_line):
+            code = line['code']
+            position = line['position']
+            lineno = line['lineno']
+            vars = self.single_rule.main(code, with_position=True)
+            if vars:
+                line_vars, positions = vars[0], vars[1]
+                for para in para_list:
+                    for var, pos in zip(line_vars, positions):
+                        if var == para:
+                            if i >= len(func.code_line):
+                                logger.error("[ERROR] params origin_postion(): func code_lineno match error")
+                                exit()
 
-                    if func.code_lineno[i] < self.line_number:
-                        pos = {"param": para, "lineno": func.code_lineno[i], "code": line}
-                        origin_postions.append(pos)
+                            if lineno <= self.line_number:
+                                p = {"param": para, "lineno": func.code_line[i], "position":(position[0]+pos[0], position[0]+pos[1]), "code": code}
+                                origin_postions.append(p)
 
         return origin_postions
 

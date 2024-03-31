@@ -185,9 +185,24 @@ class Core(object):
 
         slice = Slicing(params, self.func_call, self.target_directory, self.file_path, self.code_content, self.line_number, self.single_rule)
         vul_slice = slice.main(mode)
-        vul_slice += self.single_rule.complete_slice_end(self.code_content)
-        logger.debug("[CVI-{cvi}] [SLICING] reslut: \n{vul_slice}\n".format(cvi=self.single_rule.svid,vul_slice=vul_slice))
-        return vul_slice
+        vul_output = self.single_rule.complete_slice_end(self.code_content)
+
+        tmp = vul_slice.split(self.code_content)
+        if len(tmp) == 1:
+            logger.warning("[WARRNING]engine.Core.scan():  slice failed")
+            exit()
+
+        output = ""
+        for i, s in enumerate(tmp):
+            if i+1 ==len(tmp):
+                output += vul_output + s
+            elif i == 0:
+                output += s
+            else:
+                output += self.code_content + s
+        # logger.debug("[SLICING]\n{}\n".format(vul_slice))
+        logger.debug("[CVI-{cvi}] [SLICING]reslut: \n{vul_slice}\n".format(cvi=self.single_rule.svid,vul_slice=output))
+        return output
 
 
 

@@ -71,8 +71,8 @@ def check_html(content, remove_php=True):
             for char in html_code:
                 if char in ['\n', '\t', ' ']:
                     clear_str += char
-            if html_code.count('\n') == 0:
-                clear_str += '\n'
+            # if html_code.count('\n') == 0:
+            #     clear_str += '\n'
 
         end_pos = content.find("?>")
     return clear_str
