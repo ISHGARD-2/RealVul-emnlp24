@@ -1,4 +1,3 @@
-
 import re
 import os
 import time
@@ -9,7 +8,7 @@ import traceback
 import jsbeautifier
 from utils.log import logger
 from configs.const import ext_dict
-
+from utils.utils import match_pair, match_str
 
 ext_list = []
 for e in ext_dict:
@@ -33,6 +32,7 @@ def file_list_parse(filelist, language=None):
 
     return result
 
+
 def check_filepath(target, filepath):
     os.chdir(os.path.dirname(os.path.dirname(__file__)))
 
@@ -46,13 +46,27 @@ def check_filepath(target, filepath):
         return False
 
 
+def check_phply_syntax(code):
+    """
+    find whether stmt end with ';' in one php block
+    """
+    for i in range(len(code) - 1, -1, -1):
+        chr = code[i]
+        if chr in [';', '{', '}', ':']:
+            return code
+        elif chr in ['\f', '\n', '\r', '\t', '\v', '\n', ' ']:
+            continue
+        else:
+            return code + ';'
+
+
 def check_html(content, remove_php=True):
-    clear_str = ""
-    end_pos = content.find("?>")
-    if end_pos < 0:
+    clear_str = "<?php"
+    start_pos = match_str(content, "<?php", out_php=True)
+    if start_pos  < 0:
         return content
 
-    while end_pos >= 0:
+    while start_pos >= 0:
         if remove_php:
             # len of '<?php' and '?>'
             start_len = 5
@@ -60,46 +74,170 @@ def check_html(content, remove_php=True):
         else:
             start_len = 0
             end_len = 2
-        clear_str += content[:end_pos+end_len]
-        content = content[end_pos+2:]
 
-        start_pos = content.find("<?php")
-        if start_pos >= 0:
-            html_code = content[:start_pos]
-            content = content[start_pos+start_len:]
+        html_code = content[:start_pos]
+        content = content[start_pos + start_len:]
 
-            for char in html_code:
-                if char in ['\n', '\t', ' ']:
-                    clear_str += char
-            # if html_code.count('\n') == 0:
-            #     clear_str += '\n'
+        for char in html_code:
+            if char in ['\f', '\n', '\r', '\t', '\v', '\n', ' ']:
+                clear_str += char
+        # if html_code.count('\n') == 0:
+        #     clear_str += '\n'
 
-        end_pos = content.find("?>")
+        end_pos = match_str(content, "?>")
+
+        if end_pos > 0:
+            new_clear_str = check_phply_syntax(content[:end_pos + end_len])
+            if not new_clear_str:
+                # logger.error("[DEBUG] check_html(): 1 ,code:\n{}".format(content))
+                clear_str += content[:end_pos + end_len]
+            else:
+                clear_str += new_clear_str
+            content = content[end_pos + 2:]
+        else:
+            clear_str += content
+            break
+
+        start_pos = match_str(content, "<?php", out_php=True)
+
     return clear_str
 
-def check_comment(content):
-    content = check_html(content)
+def check_end_line_brackets(content, chr):
+    # { }
+    back_str = ""
+    check = False
+    string_count = 0
 
+    for i, c in enumerate(content):
+        if string_count > 0:
+            string_count -= 1
+            back_str += c
+            continue
+
+        if not check and c in chr:
+            check = True
+            back_str += c
+            continue
+
+        if check :
+            if c == '\n':
+                back_str += c
+                check = False
+                continue
+            elif c in ['\f', '\n', '\r', '\t', '\v', '\n', ' ']:
+                back_str += c
+                continue
+            else:
+                back_str += '\n'+c
+                if c in chr:
+                    continue
+                else:
+                    check = False
+                    continue
+
+        if  c == '\'' and string_count == 0:
+            pair_pos = match_pair(content[i:], '\'', '\'', instr=True)
+            if pair_pos:
+                string_count = pair_pos[1] - pair_pos[0]
+
+        if  c == '\"' and string_count == 0:
+            pair_pos = match_pair(content[i:], '\"', '\"', instr=True)
+            if pair_pos:
+                string_count = pair_pos[1] - pair_pos[0]
+
+        back_str += c
+
+    return back_str
+
+
+def check_end_line(content):
+    start_pos = match_str(content, ';', without_brackets=True)
+    end_pos = match_str(content[start_pos + 1:], ';', without_brackets=True) + start_pos + 1
+
+    if end_pos < 0 or start_pos < 0:
+        return content
+
+    backstr = content[:start_pos + 1]
+
+    while end_pos >= 0:
+        append = False
+        if '\n' not in content[start_pos + 1:end_pos]:
+            append = True
+
+        if append:
+            backstr += '\n' + content[start_pos + 1:end_pos + 1]
+        else:
+            backstr += content[start_pos + 1:end_pos + 1]
+
+        start_pos = end_pos
+        end_pos = match_str(content[start_pos + 1:], ';', without_brackets=True)
+        if end_pos >= 0:
+            end_pos += start_pos + 1
+
+    backstr += content[start_pos + 1:]
+
+    return backstr
+
+
+def check_end_line_elseif(content):
+    backstr = ""
+    start_pos = match_str(content, 'elseif')
+    while start_pos>=0:
+        backstr += content[:start_pos] + "else if"
+        content = content[start_pos+6:]
+
+        start_pos = match_str(content, 'elseif')
+    backstr += content
+    return backstr
+
+
+
+def check_comment(content):
     backstr = ""
     lastchar = ""
     isinlinecomment = False
     isduolinecomment = False
+    string_count = 0
 
-    for char in content:
-        if char == '/' and lastchar == '/':
+    for i, char in enumerate(content):
+        # pass string
+        if not isinlinecomment and not isduolinecomment and char == '\'' and string_count == 0:
+            pair_pos = match_pair(content[i:], '\'', '\'', instr=True)
+            if pair_pos:
+                string_count = pair_pos[1] - pair_pos[0] + 1
+
+        if not isinlinecomment and not isduolinecomment and char == '\"' and string_count == 0:
+            pair_pos = match_pair(content[i:], '\"', '\"', instr=True)
+            if pair_pos:
+                string_count = pair_pos[1] - pair_pos[0] + 1
+        if string_count > 200:
+            pass
+        if string_count > 0:
+            string_count -= 1
+            lastchar = char
+            backstr += char
+            continue
+
+        if char == '/' and lastchar == '/' and not isduolinecomment:
             backstr = backstr[:-1]
             isinlinecomment = True
             lastchar = ""
             continue
+        if char == '#' and not isduolinecomment:
+            isinlinecomment = True
+            continue
 
-        if isinlinecomment:
+        if isinlinecomment and not isduolinecomment:
             if char == '\n':
                 isinlinecomment = False
 
                 lastchar = ''
                 backstr += '\n'
+            elif char == '>' and i > 1 and content[i - 1] == '?':
+                isinlinecomment = False
+                lastchar = ''
+                backstr += '?>'
             continue
-
 
         if char == '\n':
             backstr += '\n'
@@ -125,6 +263,11 @@ def check_comment(content):
         lastchar = char
         backstr += char
 
+    backstr = check_html(backstr)
+    backstr = check_end_line(backstr)
+    backstr = check_end_line_brackets(backstr, ['{', '}'])
+    backstr = check_end_line_elseif(backstr)
+
     return backstr
 
 
@@ -135,9 +278,7 @@ class FileParseAll:
         self.target = target
         self.language = language
 
-
-
-    def grep(self, reg):
+    def grep(self, reg, file_list):
         """
         遍历目标filelist，匹配文件内容
         :param reg: 内容匹配正则
@@ -145,27 +286,22 @@ class FileParseAll:
         """
         result = []
 
-        for ffile in self.t_filelist:
-            filepath = check_filepath(self.target, ffile)
-
-            if not filepath:
-                continue
-
-            file = codecs.open(filepath, "r", encoding='utf-8', errors='ignore')
+        for ffile in file_list:
+            file = ffile.full_code.split('\n')
+            filepath = ffile.target_directory +ffile.file_path
             line_number = 1
             i = 0
             content = ""
 
             # 逐行匹配问题比较大，先测试为每5行匹配一次
-            for line in file:
+            for l in file:
+                line = l+'\n'
                 i += 1
                 line_number += 1
                 content += line
 
                 if i < 10:
                     continue
-
-                content = check_comment(content)
 
                 i = 0
                 # print line, line_number
@@ -177,7 +313,6 @@ class FileParseAll:
                     matchs = p.finditer(content)
 
                     for m in matchs:
-
                         data = m.group(0).strip()
 
                         split_data = content.split(data)[0]
@@ -219,6 +354,7 @@ class Directory(object):
     """
         :return {'.php': {'count': 2, 'list': ['/path/a.php', '/path/b.php']}}, file_sum, time_consume
     """
+
     def __init__(self, absolute_path, lans=None):
         self.file_sum = 0
         self.type_nums = {}
@@ -226,7 +362,6 @@ class Directory(object):
         self.file = []
 
         self.absolute_path = absolute_path
-
 
         self.ext_list = [ext_dict['php']]
 
@@ -272,7 +407,6 @@ class Directory(object):
                     directory = os.path.join(absolute_path, filename)
 
                     # Directory Structure
-                    logger.debug('[PICKUP] [FILES] ' + '|  ' * (level - 1) + '|--' + filename)
                     if os.path.isdir(directory):
                         self.files(directory, level + 1)
                     if os.path.isfile(directory):

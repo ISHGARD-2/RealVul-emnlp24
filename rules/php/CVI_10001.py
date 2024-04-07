@@ -28,17 +28,30 @@ class CVI_10001():
         :regex_string: regex match string
         :return:
         """
-        reg = "\$\w+"
+        reg = "\\$\\w+"
         if re.search(reg, regex_string, re.I):
             p = re.compile(reg)
             match = p.findall(regex_string)
+            matchs = re.finditer(reg, regex_string)
+
+            match_out = []
+            positions = []
+
+            for i, mp in enumerate(matchs):
+                m = match[i]
+                lp = mp.start()
+                rp = mp.end()
+
+                if lp > 0 and regex_string[lp - 1] == '\\':
+                    continue
+
+                match_out.append(m)
+                positions.append((lp, rp))
+
+
             if with_position:
-                matchs= re.finditer(reg, regex_string)
-                positions = []
-                for m in matchs:
-                    positions.append((m.start(), m.end()))
-                return [match, positions]
-            return match
+                return [match_out, positions]
+            return match_out
         return None
 
     def get_content(self, code):
@@ -49,4 +62,4 @@ class CVI_10001():
 
     def complete_slice_end(self, code):
         code = self.get_content(code)
-        return "$vulchecker_output = " + str(code)
+        return "echo " + str(code)+"\t\t//sink point here."

@@ -1,14 +1,7 @@
 
-import hashlib
 import os
-import random
-import re
-import string
-import sys
-import time
-import ast
-import zipfile
 
+from configs.const import NOT_SUPPORT_STRING, SLICE_FILTER, INPUT_VARIABLES
 from configs.settings import RULES_PATH
 
 from utils.log import logger
@@ -108,7 +101,10 @@ class ParseArgs(object):
             return u'{t}/'.format(t=target_directory)
 
 
-def match_pair(str, left_str, right_str):
+def match_pair(str, left_str, right_str, instr=False):
+    """
+    match char pair in php file
+    """
     stack_count = 1
     cal_count = 0
     start_pos = str.find(left_str)
@@ -119,8 +115,39 @@ def match_pair(str, left_str, right_str):
         return None
 
     ep = 0
+    last_char = ''
+    string_count = 0
+    pass_trans_char = True
     for i, char in enumerate(str):
-        if char == left_str:
+        if i > 0:
+            last_char = str[i-1]
+
+        if string_count > 0:
+            string_count -= 1
+            continue
+
+        if instr:
+            if last_char == '\\' and char in [last_char, right_str] and pass_trans_char:
+                pass_trans_char = False
+                continue
+            else:
+                pass_trans_char = True
+
+        # pass string
+        if not instr and char == '\'' and string_count == 0:
+            pair_pos = match_pair(str[i:], '\'', '\'', instr=True)
+            if pair_pos:
+                string_count = pair_pos[1] - pair_pos[0]
+                continue
+        elif not instr and char == '\"' and string_count == 0:
+            pair_pos = match_pair(str[i:], '\"', '\"', instr=True)
+            if pair_pos:
+                string_count = pair_pos[1] - pair_pos[0]
+                continue
+
+
+
+        if left_str != right_str and char == left_str:
             stack_count += 1
         elif char == right_str:
             stack_count -= 1
@@ -132,3 +159,103 @@ def match_pair(str, left_str, right_str):
 
     end_pos += ep
     return [start_pos, end_pos]
+
+
+def match_str(str, match_str, out_php=False, without_brackets=False):
+    """
+    match special str in php code
+    """
+    laststr = ""
+    string_count = 0
+
+    for i, char in enumerate(str):
+        if string_count > 0:
+            string_count -= 1
+            continue
+        # check mark
+        if laststr + char == match_str[:len(laststr)+1]:
+            # match str
+            if len(laststr)+1 == len(match_str):
+                # match success
+                return i - len(laststr)
+            else:
+                laststr += char
+                continue
+        else:
+            if char == '?':
+                pass
+            # last str not match
+            laststr = ""
+
+        # pass string
+        if not out_php and char == '\'' and string_count == 0:
+            pair_pos = match_pair(str[i:], '\'', '\'', instr=True)
+            if pair_pos:
+                string_count = pair_pos[1] - pair_pos[0]
+        if not out_php and char == '\"' and string_count == 0:
+            pair_pos = match_pair(str[i:], '\"', '\"', instr=True)
+            if pair_pos:
+                string_count = pair_pos[1] - pair_pos[0]
+        if without_brackets and char == '(' and string_count == 0:
+            pair_pos = match_pair(str[i:], '(', ')')
+            if pair_pos:
+                string_count = pair_pos[1] - pair_pos[0]
+
+    return -1
+
+def support_check(code):
+    for match, out_str in NOT_SUPPORT_STRING:
+        if out_str:
+            p = match_str(code, match)
+        else:
+            p = code.find(match)
+        if p>=0:
+            return False
+    return True
+
+def slice_input_check(code):
+    for input_var in INPUT_VARIABLES:
+        if input_var in code:
+            return True
+    return False
+
+def slice_filter(slice):
+    for match, out_str in SLICE_FILTER:
+        if out_str:
+            p = match_str(slice, match)
+        else:
+            p = slice.find(match)
+        if p >= 0:
+            return False
+    return True
+
+
+if __name__=='__main__':
+    os.chdir("D:\\USTC_CD\\学习\\我的论文\\LLMforSAST\\code\\LLMforSAST\\")
+    str = """    public function delete($id)
+    {
+        $oGroupToDelete = $this->loadModel($id);
+        $sGroupTitle    = $oGroupToDelete->title;
+
+        if ($oGroupToDelete->hasSurveys) {
+            Yii::app()->setFlashMessage(gT("You can't delete a group if it's not empty!"), 'error');
+            $this->getController()->redirect(isset($_POST['returnUrl']) ? $_POST['returnUrl'] : array('admin/survey/sa/listsurveys '));
+        } elseif ($oGroupToDelete->hasChildGroups) {
+            Yii::app()->setFlashMessage(gT("You can't delete a group because one or more groups depend on it as parent!"), 'error');
+            $this->getController()->redirect(isset($_POST['returnUrl']) ? $_POST['returnUrl'] : array('admin/survey/sa/listsurveys '));
+        } else {
+            $oGroupToDelete->delete();
+
+            
+            if (!isset($_GET['ajax'])) {
+                Yii::app()->setFlashMessage(sprintf(gT("The survey group '%s' was deleted."), $sGroupTitle), 'success');
+                $this->getController()->redirect(isset($_POST['returnUrl']) ? $_POST['returnUrl'] : array('admin/survey/sa/listsurveys '));
+            }
+        }
+    }
+
+    
+
+"""
+    match_pair(str, '{', '}')
+

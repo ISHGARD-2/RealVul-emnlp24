@@ -1,12 +1,17 @@
 import copy
 import codecs
 import queue
+import threading
+
+from tqdm import tqdm
+
 from utils.log import logger
 from phply import phpast as php
 from core.preprocess.pretreatment import ast_object
 from utils.file import FileParseAll, check_comment
 from configs.const import BUILTIN_FUNC
 from core.preprocess.flow import Flow, control_flow_analysis
+from utils.utils import match_str, match_pair, support_check
 
 
 class PhpRootNode:
@@ -52,6 +57,9 @@ class FunctionInfo:
     def set_code_line_position(self, file):
 
         for i, code in enumerate(self.code_split):
+            if i >= len(self.code_line):
+                logger.warning("[ERROR] func_call.set_code_line_position(): code_line error")
+
             lineno = self.code_line[i]['lineno']
             sp = len('\n'.join(file.code_content[:lineno-1]))
             if lineno > 1:
@@ -150,21 +158,42 @@ class FuncCall:
     def __file_process(self):
         self.file_list = []
         self.pfa = FileParseAll(self.files, self.target_directory)
-        for file in self.pfa.t_filelist:
-            fi = FileInfo(file, self.target_directory)
-            self.file_list.append(fi)
 
-        ast_object.init_pre(self.target_directory, self.files)
+        leng = int(len(self.pfa.t_filelist)/20) + 19
+        split_lists = [self.pfa.t_filelist[x: x + leng] for x in range(0, len(self.pfa.t_filelist), leng)]
+
+        logger.info('[FUNC_CALL][INFO] Reading files... ')
+        threading_list = []
+        for i, f_list in enumerate(split_lists):
+            t = threading.Thread(target=self.__fileinfo_save(f_list))
+            t.start()
+            threading_list.append(t)
+        for t in threading_list:
+            t.join()
+
+        ast_object.init_pre(self.target_directory, self.files, self.file_list)
         ast_object.pre_ast_all("php", is_unprecom=False)
+
+    def __fileinfo_save(self, f_list):
+        for file in f_list:
+            fi = FileInfo(file, self.target_directory)
+
+            if not support_check(fi.full_code):
+                continue
+            self.file_list.append(fi)
 
     def main(self, analysis_mode="test"):
         """
         function call collection
         analysis_mode:train or test
         """
-
-        for file in self.file_list:
+        logger.info("[INFO] Collecting functions...")
+        for file in tqdm(self.file_list):
+            ast_object.clear_none_node(file.file_path)
             nodes = ast_object.get_nodes(file.file_path)
+
+            if not nodes:
+                continue
 
             # collection function information
             # add root zone code as a function
@@ -172,21 +201,31 @@ class FuncCall:
             self.analysis_functions(nodes, [{"name": 'root', "type": None}], file, isroot=True)
             self.function_list += file.function_list
 
-        # function call analysis
-        for file in self.file_list:
-            nodes = ast_object.get_nodes(file.file_path)
-            self.analysis_call(nodes, [{"name": 'root', "type": None}], file)
+        if analysis_mode != 'test':
+            # function call analysis
+            logger.info("[INFO] Collecting function calls...")
+            for file in tqdm(self.file_list):
+                nodes = ast_object.get_nodes(file.file_path)
 
-        # save caller to function
-        self.gen_call_graph()
+                if not nodes:
+                    continue
+
+                self.analysis_call(nodes, [{"name": 'root', "type": None}], file)
+
+            # save caller to function
+            self.gen_call_graph()
 
         # control flow of every function
-        for func in self.function_list:
-
-            base_flow = Flow("base", [], func.start_lineno)
-            base_flow.set_base_flow(func.node_ast.nodes, func)
-            func.set_control_flow(control_flow_analysis(func.node_ast.nodes, base_flow, func))
-
+        logger.info("[INFO] Generating control flows...")
+        for func in tqdm(self.function_list):
+            try:
+                base_flow = Flow("base", [], func.start_lineno)
+                isset = base_flow.set_base_flow(func.node_ast.nodes, func)
+                if not isset:
+                    continue
+                func.set_control_flow(control_flow_analysis(func.node_ast.nodes, base_flow, func))
+            except Exception as e:
+                continue
         return
 
 
@@ -262,7 +301,7 @@ class FuncCall:
                     new_nodes = node.nodes
                     self.analysis_call(new_nodes, new_father_list, file)
                 if hasattr(node, "elseifs") and node.elseifs:
-                    new_nodes = node.elseifs.node
+                    new_nodes = node.elseifs
                     self.analysis_call(new_nodes, new_father_list, file)
                 if hasattr(node, "else_") and node.else_:
                     new_nodes = [node.else_.node]
@@ -357,17 +396,15 @@ class FuncCall:
 
         same_name_func = []
         for func in file.function_list:
-            if func.func_name == func_call_name and type == func.func_type:
+            if func.func_name == func_call_name and type == func.func_type and func.func_name != '__construct':
                 same_name_func.append(func)
 
         # analysis which function can functioncall  access
         if len(same_name_func) == 1:
             return same_name_func[0]
-        elif len(same_name_func) > 1:
+        elif len(same_name_func) > 1 and len(same_name_func) <=3:
             logger.warning(
-                "[WARNING] function match multy result:\n\t\t\trealm: {}, \n\tfunction name:".format(father_list,
-                                                                                                   same_name_func[
-                                                                                                       0].func_name))
+                "[WARNING] function match multy result:\n\t\t\trealm: {}, \n\tfunction name:".format(father_list,same_name_func[0].func_name))
             result_func = None
             for func in same_name_func:
                 if result_func == None:
@@ -397,8 +434,10 @@ class FuncCall:
 
             if result_func == None:
                 logger.error("[ERROR] function match error: 1")
-                exit()
+
             return result_func
+        elif len(same_name_func) >3:
+            return None
         else:
             # include
             include_files = file.include_list
@@ -420,7 +459,7 @@ class FuncCall:
                 return same_name_func[0]
             elif len(same_name_func) > 1:
                 logger.error("[ERROR] function match error: 2")
-                exit()
+
             else:
                 # build in function
                 find_buildin = False
@@ -430,12 +469,12 @@ class FuncCall:
                         break
                 if find_buildin:
                     #         return FunctionInfo(func, "build_in", [], None, None, None)
-                    logger.debug(
-                        "[DEBUG] function match found buildin: {} in file: {}".format(func_call_name, file.file_path))
+                    # logger.debug(
+                    #     "[DEBUG] function match found buildin: {} in file: {}".format(func_call_name, file.file_path))
                     return None
                 else:
-                    logger.error(
-                        "[Warning] function match not found: {} in file: {}".format(func_call_name, file.file_path))
+                    # logger.error(
+                    #     "[Warning] function match not found: {} in file: {}".format(func_call_name, file.file_path))
                     return None
 
     def init_function_list(self, nodes, file):
@@ -444,22 +483,36 @@ class FuncCall:
         add to function_list
         """
         new_nodes = []
-        new_code = "\n".join(file.code_content[0:nodes[0].lineno - 1])
+        new_code = "\n".join(file.code_content[:nodes[0].lineno - 1])
         code_line = [{'lineno':i + 1, 'position':None} for i in range(nodes[0].lineno - 1)]
         end_lineno = nodes[0].lineno - 1
 
         for i, node in enumerate(nodes):
-            if i + 1 == len(nodes):
+            next_node = None
+            if i + 1 >= len(nodes):
                 next_lineno = len(file.code_content) + 1
             else:
-                next_lineno = nodes[i + 1].lineno
+                next_node = nodes[i + 1]
+                if next_node:
+                    next_lineno = next_node.lineno
+                else:
+                    logger.error("[ERROR] func_call.init_function_list(): 1")
+
+
 
             start_pos = node.lineno - 1
-            if i + 1 == len(nodes):
-                new_code += "\n" + "\n".join(file.code_content[start_pos:])
+            if not next_node:
+                if start_pos == 0:
+                    new_code += "\n".join(file.code_content[start_pos:])
+                else:
+                    new_code += "\n" + "\n".join(file.code_content[start_pos:])
             else:
-                end_pos = nodes[i + 1].lineno - 1
-                new_code += "\n" + "\n".join(file.code_content[start_pos:end_pos])
+                end_pos = next_node.lineno - 1
+                if end_pos>start_pos:
+                    if start_pos == 0:
+                        new_code += "\n".join(file.code_content[start_pos:end_pos])
+                    else:
+                        new_code += "\n" + "\n".join(file.code_content[start_pos:end_pos])
             for l in range(node.lineno, next_lineno):
                 code_line.append({'lineno':l, 'position':None})
             end_lineno = len(file.code_content)
@@ -517,7 +570,7 @@ class FuncCall:
                 new_nodes = node.nodes
                 self.analysis_functions(new_nodes, new_father_list, file)
             if hasattr(node, "elseifs") and node.elseifs:
-                new_nodes = node.elseifs.node
+                new_nodes = node.elseifs
                 self.analysis_functions(new_nodes, new_father_list, file)
             if hasattr(node, "else_") and node.else_:
                 new_nodes = [node.else_.node]
@@ -537,37 +590,21 @@ class FuncCall:
         if next_node:
             last_lineno = next_node.lineno - 1
 
-        func_code = '\n'.join(file.code_content[start_lineno:last_lineno])
-
-        if next_node:
+            func_code = '\n'.join(file.code_content[start_lineno:last_lineno])
             code_line = [{'lineno':start_lineno + 1 + i, 'position':None} for i in range(last_lineno - start_lineno)]
             return func_code, start_lineno + 1, last_lineno + 1, code_line
+        else:
+            func_code = '\n'.join(file.code_content[start_lineno:])
 
         # last node
-        stack_count = 1
-        tem_code = func_code[func_code.find('{') + 1:]
-        last_pos = func_code.find('{') + 1
-        cal_count = 0
-        touch_end = False
-        code_line = []
-        while stack_count != 0:
-            if cal_count > 10:
-                logger.error("[ERROR] get_func_code(): iter error, code: {}".format(tem_code))
-                exit()
-            left_pos = tem_code.find('{') + 1
-            righ_pos = tem_code.find('}') + 1
+        tem_code = func_code[match_str(func_code, '{'):]
+        last_pos = match_str(func_code, '{') + 1
+        lr_pos = match_pair(tem_code, '{', '}')
+        if not lr_pos:
+            logger.error("[ERROR] get_func_code(): iter error, code: {}".format(tem_code))
 
-            if left_pos == 0:
-                touch_end = True
 
-            if left_pos < righ_pos and left_pos != 0:
-                stack_count += 1
-                tem_code = tem_code[left_pos:]
-                last_pos += left_pos
-            else:
-                stack_count -= 1
-                tem_code = tem_code[righ_pos:]
-                last_pos += righ_pos
+        last_pos += lr_pos[1]
 
         func_code = func_code[:last_pos]
         last_lineno = start_lineno
@@ -577,3 +614,5 @@ class FuncCall:
             code_line.append({'lineno':last_lineno, 'position':None})
 
         return func_code, start_lineno + 1, last_lineno, code_line
+
+

@@ -46,6 +46,21 @@ def args_format():
     return args
 
 
+def preprocess(args):
+    # prepare args
+    pa, target_directory, files = args_prepare(args)
+    mode = args.mode
+
+    # generate function call relationship
+    func_call = FuncCall(target_directory, files)
+    func_call.main(mode)
+
+    # scan
+
+    origin_vulns = scan(func_call, target_directory=target_directory, special_rules=pa.special_rules, files=files,
+                        mode=mode)
+
+
 def main():
     try:
         # arg parse
@@ -59,16 +74,11 @@ def main():
         args = args_format()
 
         # prepare args
-        pa, target_directory, files = args_prepare(args)
         mode = args.mode
 
-        # generate function call relationship
-        func_call = FuncCall(target_directory, files)
-        func_call.main()
+        if mode == 'test':
+            preprocess(args)
 
-        # scan
-
-        origin_vulns = scan(func_call, target_directory=target_directory, special_rules=pa.special_rules, files=files, mode=mode)
 
         t2 = time.time()
         logger.info('[INIT] Done! Consume Time:{ct}s'.format(ct=t2 - t1))

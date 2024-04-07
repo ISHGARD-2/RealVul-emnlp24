@@ -1,7 +1,10 @@
+from core.preprocess.pretreatment import get_var_by_ast
 from utils.log import logger
 import queue
 from phply import phpast as php
 from configs.const import INPUT_VARIABLES
+from utils.utils import slice_filter, slice_input_check
+
 
 class OneSlice:
     """
@@ -9,6 +12,7 @@ class OneSlice:
     func_call_tree: {}
         callers:""
     """
+
     def __init__(self):
         pass
 
@@ -37,18 +41,29 @@ class Slicing:
         vuln slices collection
         """
         func = self.find_vuln_position()
+        if not func:
+            return None
 
         slice = self.slice_func(func, mode)
 
-        return slice
+        if slice is None or not slice_filter(slice) or not slice_input_check(slice):
+            return None
 
+        return slice
 
     def slice_func(self, func, mode):
         global code_slice_flag, para_list
         para_list = []
         new_para = self.params
 
+        isfunc = False
+        if func.func_name != 'root' and func.func_type != None:
+            isfunc = True
+
         # control flow
+        if not hasattr(func, 'control_flow'):
+            return None
+
         control_flow = func.control_flow
         code_slice_flag = [0 for i in range(control_flow.all_code_position[-1]['position'][1])]
 
@@ -61,17 +76,32 @@ class Slicing:
             para_list += new_para
 
             origin_pos = self.origin_postion(func, new_para)
-            new_para = self.subnode_scan(func, control_flow, origin_pos)
+            new_para = self.subnode_scan(func, control_flow, origin_pos, isfunc=isfunc)
             pass
 
         code_slice = self.get_slice_from_flow(control_flow, True)
 
+        slice_pre = "<?php\n"
         # find params of function, trans to further function
-        #...
+        if isfunc:
+            control_params = []
+            func_params = func.node_ast.params
+            for func_p in func_params:
+                func_p_name = func_p.name
+                for par in para_list:
+                    if par == func_p_name:
+                        control_params.append(func_p_name)
+                        break
+            slice_pre += "// controlable parameters: \n"
+            for i, var in enumerate(control_params):
+                slice_pre += var+" = $_GET('input"+str(i)+"');\n"
+            slice_pre += '\n'
+        # ...
 
         control_flow.clear_flag()
 
-        code_slice = self.clear_slice(code_slice)
+        slice_pre += "// php code: \n"
+        code_slice = slice_pre + self.clear_slice(code_slice)
 
         return code_slice
 
@@ -91,8 +121,9 @@ class Slicing:
 
         if isroot:
             code_slice = ''
+            base = flow.all_code_position[0]['position'][0]
             for i, char in enumerate(flow.code):
-                if code_slice_flag[i]:
+                if code_slice_flag[i+base]:
                     code_slice += char
 
             return code_slice
@@ -109,12 +140,10 @@ class Slicing:
                 if char not in [' ', '\t']:
                     reserve = True
             if reserve:
-                new_slice += line+'\n'
+                new_slice += line + '\n'
         return new_slice
 
-
-
-    def subnode_scan(self, func, control_flow, origin_pos):
+    def subnode_scan(self, func, control_flow, origin_pos, isfunc=False):
         global para_list
         new_param = set()
         sub_flow = control_flow.subnode
@@ -126,21 +155,25 @@ class Slicing:
         for var in origin_pos:
             var_sp = var['position'][0]
             var_ep = var['position'][1]
+            var_last = var['last']
             if all_sp <= var_sp and var_ep <= all_ep:
+                if not var_last and \
+                        control_flow.name == 'others' and \
+                        not self.data_flow_analysis(control_flow.subnode, para_list, control_flow.self_code):
+                    continue
                 # set_flag
                 control_flow.set_flag()
                 break
 
         # new params
-        if control_flow.flag:
+        if control_flow.flag and not isfunc:
             params = self.single_rule.main(control_flow.self_code)
             if params:
                 for p in params:
                     if p not in para_list and p not in INPUT_VARIABLES:
                         new_param.add(p)
 
-
-        #subnode mark
+        # subnode mark
         if control_flow.name != 'others':
             for i, flow in enumerate(sub_flow):
                 if flow.lineno <= self.line_number:
@@ -149,8 +182,39 @@ class Slicing:
                         if p not in para_list and p not in INPUT_VARIABLES:
                             new_param.add(p)
 
+            clear_flag = True
+            for i, flow in enumerate(sub_flow):
+                if flow.flag == 1:
+                    clear_flag = False
+                    break
+
+            if clear_flag:
+                control_flow.set_flag0()
+                new_param = []
+
         return list(new_param)
 
+    def data_flow_analysis(self, node, params, code):
+        vars = []
+        if isinstance(node, php.Assignment) or isinstance(node, php.AssignOp):
+            tvars = self.single_rule.main(code[:code.find('=')])
+            if tvars:
+                for v in tvars:
+                    vars.append(v)
+        elif isinstance(node, php.ListAssignment):
+            logger.debug("[DEBUG] slicing.data_flow_analysis()")
+            for n in node.nodes:
+                var = get_var_by_ast(n)
+                vars.append(var)
+
+
+        elif isinstance(node, php.MethodCall):
+            return True
+
+        for v in vars:
+            if v in params:
+                return True
+        return False
 
     def origin_postion(self, func, para_list):
         origin_postions = []
@@ -168,16 +232,22 @@ class Slicing:
                         if var == para:
                             if i >= len(func.code_line):
                                 logger.error("[ERROR] params origin_postion(): func code_lineno match error")
-                                exit()
+
 
                             if lineno <= self.line_number:
-                                p = {"param": para, "lineno": func.code_line[i], "position":(position[0]+pos[0], position[0]+pos[1]), "code": code}
+                                last = False
+                                if lineno == self.line_number:
+                                    last = True
+
+                                p = {"param": para,
+                                     "lineno": func.code_line[i],
+                                     "position": (position[0] + pos[0], position[0] + pos[1]),
+                                     "code": code,
+                                     'last':last}
+
                                 origin_postions.append(p)
 
         return origin_postions
-
-
-
 
     def find_vuln_position(self):
         root_func = None
@@ -193,7 +263,7 @@ class Slicing:
         if not find_func:
             if not root_func:
                 logger.error("[ERROR][SLICING] root_func not found : {}".format(self.code_content))
-                exit()
+                return None
             find_func = root_func
 
         return find_func

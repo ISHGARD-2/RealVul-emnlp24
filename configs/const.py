@@ -29,3 +29,15 @@ INPUT_VARIABLES = [
     '$HTTP_POST_VARS',
     '$HTTP_RAW_POST_DATA',
     '$HTTP_GET_VARS']
+
+NOT_SUPPORT_STRING = [
+    ('endif', True),
+    ('<<<', True),
+    ('??', True),
+    # ('include ', True),
+    # ('require', True)
+
+]
+SLICE_FILTER = [
+    ('CATCH', True)
+]

@@ -1,7 +1,10 @@
+import threading
 
 from phply.phplex import lexer  # 词法分析
 from phply.phpparse import make_parser  # 语法分析
 from phply import phpast as php
+from tqdm import tqdm
+
 from utils.file import check_comment
 
 from utils.log import logger
@@ -13,6 +16,8 @@ import codecs
 import traceback
 import queue
 import asyncio
+
+from utils.utils import support_check
 
 
 class Pretreatment:
@@ -30,13 +35,13 @@ class Pretreatment:
 
         # self.pre_ast_all()
 
-    def init_pre(self, target_directory, files):
+    def init_pre(self, target_directory, files, file_list):
         self.file_list = files
         self.target_directory = target_directory
 
         self.target_directory = os.path.normpath(self.target_directory)
-        for fileext in self.file_list:
-            self.target_queue.put(fileext)
+        for fileinfo in file_list:
+                self.target_queue.put((fileinfo.full_code, fileinfo.file_path))
 
     def get_path(self, filepath):
         os.chdir(os.path.dirname(os.path.dirname(__file__)))
@@ -61,6 +66,7 @@ class Pretreatment:
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+        logger.info('[PRE-AST] [INFO] AST GENERATING... ')
 
         scan_list = (self.pre_ast() for i in range(10))
         loop.run_until_complete(asyncio.gather(*scan_list))
@@ -69,82 +75,138 @@ class Pretreatment:
 
         while not self.target_queue.empty():
 
-            fileext = self.target_queue.get()
+            (full_code, file_path) = self.target_queue.get()
 
-            if not self.lan:
-                break
+            # 下面是对于php文件的处理逻辑
+            filepath = self.get_path(file_path)
+            self.pre_result[filepath] = {}
+            self.pre_result[filepath]['language'] = 'php'
+            self.pre_result[filepath]['ast_nodes'] = []
 
-            if fileext[0] in ext_dict['php'] and 'php' in self.lan:
-                # 下面是对于php文件的处理逻辑
-                for filepath in fileext[1]['list']:
+            # self.pre_result[filepath]['content'] = code_content
+
+            try:
+                if not self.is_unprecom:
+                    parser = make_parser()
+                    all_nodes = parser.parse(full_code, debug=False, lexer=lexer.clone(), tracking=True)
+                else:
                     all_nodes = []
-                    filepath = self.get_path(filepath)
-                    self.pre_result[filepath] = {}
-                    self.pre_result[filepath]['language'] = 'php'
-                    self.pre_result[filepath]['ast_nodes'] = []
 
-                    fi = codecs.open(filepath, "r", encoding='utf-8', errors='ignore')
-                    code_content = fi.read()
-                    code_content = check_comment(code_content)
-                    fi.close()
+                # 合并字典
+                self.pre_result[filepath]['ast_nodes'] = all_nodes
 
-                    # self.pre_result[filepath]['content'] = code_content
+            except SyntaxError as e:
+                logger.warning('[AST] [ERROR] parser {}:{} SyntaxError or phply not support'.format(filepath, str(e.lineno)))
+                continue
 
-                    try:
-                        if not self.is_unprecom:
-                            parser = make_parser()
-                            all_nodes = parser.parse(code_content, debug=False, lexer=lexer.clone(), tracking=True)
-                        else:
-                            all_nodes = []
+            except AssertionError as e:
+                logger.warning('[AST] [ERROR] parser {}: {}'.format(filepath, traceback.format_exc()))
+                continue
 
-                        # 合并字典
-                        self.pre_result[filepath]['ast_nodes'] = all_nodes
+            except:
+                logger.warning('[AST] something error, {}'.format(traceback.format_exc()))
+                continue
 
-                    except SyntaxError as e:
-                        logger.warning('[AST] [ERROR] parser {} SyntaxError'.format(filepath))
-                        continue
+            # 搜索所有的常量
+            # for node in all_nodes:
+            #     if isinstance(node, php.FunctionCall) and node.name == "define":
+            #         define_params = node.params
+            #
+            #         if define_params:
+            #             logger.debug(
+            #                 "[AST][Pretreatment] new define {}={}".format(define_params[0].node,
+            #                                                               define_params[1].node))
+            #
+            #             key = define_params[0].node
+            #             if isinstance(key, php.Constant):
+            #                 key = key.name
+            #
+            #             self.define_dict[key] = define_params[1].node
 
-                    except AssertionError as e:
-                        logger.warning('[AST] [ERROR] parser {}: {}'.format(filepath, traceback.format_exc()))
-                        continue
 
-                    except:
-                        logger.warning('[AST] something error, {}'.format(traceback.format_exc()))
-                        continue
-
-                    # 搜索所有的常量
-                    for node in all_nodes:
-                        if isinstance(node, php.FunctionCall) and node.name == "define":
-                            define_params = node.params
-
-                            if define_params:
-                                logger.debug(
-                                    "[AST][Pretreatment] new define {}={}".format(define_params[0].node,
-                                                                                  define_params[1].node))
-
-                                key = define_params[0].node
-                                if isinstance(key, php.Constant):
-                                    key = key.name
-
-                                self.define_dict[key] = define_params[1].node
-
-            # 手动回收?
-            gc.collect()
-
-        return True
-
-    def get_nodes(self, filepath, vul_lineno=None, lan=None):
+    def get_nodes(self, filepath):
         filepath = os.path.normpath(filepath)
+        fullpath = os.path.join(self.target_directory, filepath)
 
         if filepath in self.pre_result:
             return self.pre_result[filepath]['ast_nodes']
 
-        elif os.path.join(self.target_directory, filepath) in self.pre_result:
-            return self.pre_result[os.path.join(self.target_directory, filepath)]['ast_nodes']
+        elif fullpath in self.pre_result:
+            return self.pre_result[fullpath]['ast_nodes']
 
         else:
             logger.warning("[AST] file {} parser not found...".format(filepath))
             return False
+
+    def clear_none_node(self, filepath):
+        filepath = os.path.normpath(filepath)
+        fullpath = os.path.join(self.target_directory, filepath)
+        allnodes = []
+
+        if filepath in self.pre_result:
+            allnodes = self.pre_result[filepath]['ast_nodes']
+
+        elif fullpath in self.pre_result:
+            allnodes = self.pre_result[fullpath]['ast_nodes']
+
+        else:
+            logger.warning("[AST] file {} parser not found...".format(filepath))
+            return None
+
+        allnodes = self.pop_none_node(allnodes)
+
+
+        if filepath in self.pre_result:
+            self.pre_result[filepath]['ast_nodes'] = allnodes
+
+        elif fullpath in self.pre_result:
+            self.pre_result[fullpath]['ast_nodes'] = allnodes
+
+        else:
+            logger.warning("[AST] file {} parser not found...".format(filepath))
+            return None
+
+    def pop_none_node(self, nodes):
+
+        for i, node in enumerate(nodes):
+            if node is None:
+                del nodes[i]
+                continue
+
+            is_recursion = False
+            if isinstance(node, php.If) or isinstance(node, php.ElseIf) \
+                    or isinstance(node, php.DoWhile) or isinstance(node, php.Foreach) or isinstance(node, php.While) \
+                    or isinstance(node, php.Switch) or isinstance(node, php.Case):
+                is_recursion = True
+
+
+            elif isinstance(node, php.Block) or isinstance(node, php.Echo) or isinstance(node, php.Print):
+                is_recursion = True
+
+            # Scope zone
+            if isinstance(node, php.Class) or isinstance(node, php.Function) or isinstance(node, php.Method):
+                is_recursion = True
+
+
+            # next node
+            if is_recursion:
+                if hasattr(node, "node"):
+                    new_nodes = [node.node]
+                    self.pop_none_node(new_nodes)
+                if hasattr(node, "nodes"):
+                    new_nodes = node.nodes
+                    self.pop_none_node(new_nodes)
+                if hasattr(node, "elseifs") and node.elseifs:
+                    new_nodes = node.elseifs
+                    self.pop_none_node(new_nodes)
+                if hasattr(node, "else_") and node.else_:
+                    new_nodes = [node.else_.node]
+                    self.pop_none_node(new_nodes)
+                else:
+                    continue
+
+        return nodes
+
 
 
 ast_list = []
@@ -161,5 +223,12 @@ def get_ast_by_name(name):
         return ast_list[name]
     return None
 
+
+def get_var_by_ast(node):
+    if isinstance(node, php.Variable) or \
+            isinstance(node, php.ClassVariable) or \
+            isinstance(node, php.StaticVariable):
+        return node.name
+    return ''
 
 
