@@ -1,3 +1,5 @@
+from configs.settings import CONFIG_PATH
+
 ext_dict = {
     "php": ['.php', '.php3', '.php4', '.php5', '.php7', '.pht', '.phs', '.phtml', '.inc'],
 }
@@ -5,7 +7,7 @@ ext_dict = {
 NEWLINE_FLAGS = ["<?php", "{", "}", ";"]
 
 # built in function names
-code = open("configs/buildin_func.txt", "r", encoding="utf-8").read()
+code = open(CONFIG_PATH+"/buildin_func.txt", "r", encoding="utf-8").read()
 BUILTIN_FUNC = code.split('\n')
 
 REGEX = {

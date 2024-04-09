@@ -1,11 +1,7 @@
 import re
 import os
 import time
-import json
-import codecs
-import zipfile
 import traceback
-import jsbeautifier
 from utils.log import logger
 from configs.const import ext_dict
 from utils.utils import match_pair, match_str
@@ -191,8 +187,22 @@ def check_end_line_elseif(content):
     return backstr
 
 
+def clear_slice(slice):
+    slice_split = slice.split('\n')
+    new_slice = ""
 
-def check_comment(content):
+    # clear multy '\n'
+    for line in slice_split:
+        reserve = False
+        for char in line:
+            if char not in [' ', '\t']:
+                reserve = True
+        if reserve:
+            new_slice += line + '\n'
+    return new_slice
+
+
+def check_comment(content, check_inner_content=True):
     backstr = ""
     lastchar = ""
     isinlinecomment = False
@@ -264,9 +274,10 @@ def check_comment(content):
         backstr += char
 
     backstr = check_html(backstr)
-    backstr = check_end_line(backstr)
-    backstr = check_end_line_brackets(backstr, ['{', '}'])
-    backstr = check_end_line_elseif(backstr)
+    if check_inner_content:
+        backstr = check_end_line(backstr)
+        backstr = check_end_line_brackets(backstr, ['{', '}'])
+        backstr = check_end_line_elseif(backstr)
 
     return backstr
 

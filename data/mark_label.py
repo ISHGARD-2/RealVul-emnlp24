@@ -1,4 +1,5 @@
 import json
+import time
 from time import sleep
 
 import openai
@@ -6,20 +7,17 @@ from openai import OpenAI
 
 import os
 
+from configs.settings import DATA_PATH
+from utils.file import check_comment, clear_slice
+
 os.environ["http_proxy"] = 'http://127.0.0.1:10810'
 os.environ["https_proxy"] = 'http://127.0.0.1:10810'
 client = OpenAI(api_key='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')
 # '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'
 
-Describe = "Your identity is a vulnerability mining expert proficient in PHP. " \
-           "You can analyze the PHP code I provide and check for XSS vulnerabilities. " \
-           "If there is an XSS vulnerability, just return 'vulnerable'; " \
-           "otherwise, reply that it does not 'safe'." \
-           "If you are unsure whether the vulnerability exists, return 'unknown'"
-
 
 # 定义调用 ChatGPT 的函数
-def Chat_Code(Order, Model="gpt-4"):
+def Chat_Code(Order, Describe, Model="gpt-3.5-turbo"):
     '''
     Order：告诉 ChatGPT 如何处理数据的命令
     Model：使用的语言模型，默认使用 gpt-3.5-turbo
@@ -27,6 +25,7 @@ def Chat_Code(Order, Model="gpt-4"):
     global Space
     global BaseMessage
     global result
+
 
     # 定义和储存历史消息
     BaseMessage = [{"role": "system", "content": Describe}]
@@ -66,8 +65,14 @@ def Chat_Code(Order, Model="gpt-4"):
         return result
 
 
-def mark_label():
-    fp = open('D:\\USTC_CD\\学习\我的论文\\LLMforSAST\\code\\LLMforSAST\\data\\CVI_10001\\dataset_raw5.json', 'r')
+def mark_label_Crossvul_sample():
+    Describe = "Your identity is a vulnerability mining expert proficient in PHP. " \
+               "You can analyze the PHP code I provide and check for XSS vulnerabilities. " \
+               "If there is an XSS vulnerability, just return 'vulnerable'; " \
+               "otherwise, reply that it does not 'safe'." \
+               "If you are unsure whether the vulnerability exists, return 'unknown'"
+
+    fp = open(DATA_PATH+'\\CVI_10001\\dataset_raw5.json', 'r')
     json_data = json.load(fp)
     fp.close()
 
@@ -78,11 +83,11 @@ def mark_label():
         try:
             # print('\n' + slice['slice'].replace('$vulchecker_output = ', 'echo '))
             print('\n-------------------------' + slice['file_name'] + '----------------------------\n')
-            fp = open('D:\\USTC_CD\\学习\我的论文\\LLMforSAST\\code\\LLMforSAST\\data\\CVI_10001\\dataset_out5.json', 'w')
+            fp = open(DATA_PATH+'\\CVI_10001\\dataset_out5.json', 'w')
 
             code = slice['slice']
 
-            label = Chat_Code(code)
+            label = Chat_Code(code, Describe)
 
             if label in ['safe', "Safe", "'safe'"]:
                 GPT_label = 'safe'
@@ -118,9 +123,51 @@ def mark_label():
 
 
 
+def mark_label_SARD_sample():
+    Describe = "Your identity is an expert proficient in PHP. " \
+               "Please replace the variable names in the following PHP code with more reasonable names, " \
+               "and do not use named and sanitized names." \
+               "Please only return PHP code."
+
+    fp = open(DATA_PATH+'/SARD/SARD_php_vulnerability.json', 'r')
+    json_data = json.load(fp)
+    fp.close()
+
+    for i, slice in enumerate(json_data):
+        if slice['renamed_code'] != '':
+            continue
+
+        try:
+            # # print('\n' + slice['slice'].replace('$vulchecker_output = ', 'echo '))
+            # print('\n-------------------------' + slice['file_name'] + '----------------------------\n')
+            t1 = time.time()
+            fp = open(DATA_PATH+'/SARD/SARD_php_vulnerability.json', 'w')
+
+            code = slice['slice']
+
+            renamed_code = Chat_Code(code, Describe)
+
+            renamed_code = check_comment(renamed_code, check_inner_content=False)
+            renamed_code = clear_slice(renamed_code)
+
+            json_data[i]['renamed_code'] = renamed_code
+
+            output_data = json.dumps(json_data)
+            fp.write(output_data)
+            fp.close()
+
+            t2 = time.time()
+            if t2 - t1 < 0.5:
+                sleep(1)
+        except:
+            output_data = json.dumps(json_data)
+            fp.write(output_data)
+            break
+    fp.close()
+
 
 if __name__ == '__main__':
-    mark_label()
+    mark_label_SARD_sample()
 
 #     code = """<?php
 # // controlable parameters:
@@ -129,4 +176,9 @@ if __name__ == '__main__':
 # 		if( !empty($_GET['dir']) ){
 # 			echo ' <input type="hidden" name="dir" value="'.htmlspecialchars($_GET['dir']).'" />'		//sink point here.;
 # 		}"""
-#     Chat_Code(code)
+#
+#     try:
+#         Chat_Code(code)
+#
+#     except:
+#         print('failed')

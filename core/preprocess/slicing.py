@@ -1,4 +1,5 @@
 from core.preprocess.pretreatment import get_var_by_ast
+from utils.file import clear_slice
 from utils.log import logger
 import queue
 from phply import phpast as php
@@ -101,7 +102,7 @@ class Slicing:
         control_flow.clear_flag()
 
         slice_pre += "// php code: \n"
-        code_slice = slice_pre + self.clear_slice(code_slice)
+        code_slice = slice_pre + clear_slice(code_slice)
 
         return code_slice
 
@@ -129,19 +130,7 @@ class Slicing:
             return code_slice
         return
 
-    def clear_slice(self, slice):
-        slice_split = slice.split('\n')
-        new_slice = ""
 
-        # clear multy '\n'
-        for line in slice_split:
-            reserve = False
-            for char in line:
-                if char not in [' ', '\t']:
-                    reserve = True
-            if reserve:
-                new_slice += line + '\n'
-        return new_slice
 
     def subnode_scan(self, func, control_flow, origin_pos, isfunc=False):
         global para_list
