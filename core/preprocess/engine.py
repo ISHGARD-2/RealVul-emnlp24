@@ -141,7 +141,8 @@ class SingleRule(object):
                 vul_slice = core.scan()
                 if vul_slice:
                     if self.mode == 'test':
-                        self.save_test_samples(vul_slice, origin_vulnerability[0])
+                        for s in vul_slice:
+                            self.save_test_samples(s, origin_vulnerability[0])
 
         slices = json.dumps(self.slices)
         f = open(self.rule_data_path + '/dataset_raw4.json', 'w')
@@ -211,50 +212,40 @@ class Core(object):
 
         if not params:
             return None
-
+        params = list(set(params))
         # program slicing
         logger.debug(
             "{line1}[CVI-{cvi}][SLICING]{line2}".format(cvi=self.single_rule.svid, line1='-' * 30, line2='-' * 30))
         logger.debug("""[CVI-{cvi}][SLICING] > File: `{file}:{line}` > Code: `{code}`""".format(
             cvi=self.single_rule.svid, file=self.file_path,
             line=self.line_number, code=self.code_content))
+
+        output_list=[]
         for param_name in params:
             logger.debug('[AST] Param: `{0}`'.format(param_name))
+            para = {'name':param_name, 'lineno':int(self.line_number)}
+            # make slice here
+            slice = Slicing([para], self.func_call, self.target_directory, self.file_path, self.code_content,
+                            self.line_number, self.single_rule)
+            vul_slice = slice.main(self.mode)
 
-        slice = Slicing(params, self.func_call, self.target_directory, self.file_path, self.code_content,
-                        self.line_number, self.single_rule)
-        vul_slice = slice.main(self.mode)
 
+            if not vul_slice or len(vul_slice) > MAX_SLICE_LENGTH:
+                return None
 
-        if not vul_slice or len(vul_slice) > MAX_SLICE_LENGTH:
-            logger.debug('[SLICE] slice too long\n')
-            return None
+            slilce_check = self.slilce_check_syntax(vul_slice)
 
-        slilce_check = self.slilce_check_syntax(vul_slice)
+            if not slilce_check or self.code_content not in vul_slice:
+                return None
 
-        if not slilce_check or self.code_content not in vul_slice:
-            return None
+            output = self.single_rule.complete_slice_end(vul_slice, self.code_content, para)
 
-        vul_output = self.single_rule.complete_slice_end(self.code_content)
+            if output:
+            # logger.debug("[SLICING]\n{}\n".format(vul_slice))
+                logger.debug("[CVI-{cvi}] [SLICING]reslut: \n{vul_slice}\n".format(cvi=self.single_rule.svid, vul_slice=output))
+                output_list.append(output)
+        return output_list
 
-        tmp = vul_slice.split(self.code_content)
-        # if len(tmp) == 1 and len(tmp[0].strip()) > 2:
-        #     logger.warning("[WARRNING]engine.Core.scan():  slice failed")
-        #     return None
-
-        output = ""
-        for i, s in enumerate(tmp):
-            if i == 0 and len(tmp) > 1:
-                output += s
-            elif i + 1 == len(tmp):
-                output += vul_output + s
-            elif i == 0 and len(tmp) == 1:
-                output += s + vul_output
-            else:
-                output += self.code_content + s
-        # logger.debug("[SLICING]\n{}\n".format(vul_slice))
-        logger.debug("[CVI-{cvi}] [SLICING]reslut: \n{vul_slice}\n".format(cvi=self.single_rule.svid, vul_slice=output))
-        return output
 
     def slilce_check_syntax(self, code):
 

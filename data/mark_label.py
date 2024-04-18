@@ -1,23 +1,31 @@
 import json
+import threading
 import time
+from math import ceil
 from time import sleep
 
+import copy
 import openai
+import operator
 from openai import OpenAI
 
 import os
+
+from tqdm import tqdm
 
 from configs.settings import DATA_PATH
 from utils.file import check_comment, clear_slice
 
 os.environ["http_proxy"] = 'http://127.0.0.1:10810'
 os.environ["https_proxy"] = 'http://127.0.0.1:10810'
-client = OpenAI(api_key='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')
+client = OpenAI(api_key='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')
+
+
 # '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'
 
 
 # 定义调用 ChatGPT 的函数
-def Chat_Code(Order, Describe, Model="gpt-3.5-turbo"):
+def Chat_Code(Order, Describe, Model="gpt-4"):
     '''
     Order：告诉 ChatGPT 如何处理数据的命令
     Model：使用的语言模型，默认使用 gpt-3.5-turbo
@@ -25,7 +33,6 @@ def Chat_Code(Order, Describe, Model="gpt-3.5-turbo"):
     global Space
     global BaseMessage
     global result
-
 
     # 定义和储存历史消息
     BaseMessage = [{"role": "system", "content": Describe}]
@@ -66,119 +73,221 @@ def Chat_Code(Order, Describe, Model="gpt-3.5-turbo"):
 
 
 def mark_label_Crossvul_sample():
-    Describe = "Your identity is a vulnerability mining expert proficient in PHP. " \
-               "You can analyze the PHP code I provide and check for XSS vulnerabilities. " \
-               "If there is an XSS vulnerability, just return 'vulnerable'; " \
-               "otherwise, reply that it does not 'safe'." \
-               "If you are unsure whether the vulnerability exists, return 'unknown'"
+    Describe = """Your identity is a vulnerability mining expert proficient in PHP.
+You can analyze the PHP code I provided and check for XSS vulnerabilities.
+If you are very certain that there is an XSS vulnerability in this code, return vulnerable;
+Otherwise, return safe."""
 
-    fp = open(DATA_PATH+'\\CVI_10001\\dataset_raw5.json', 'r')
+    fp = open(DATA_PATH + '\\CVI_10001\\dataset_raw5.json', 'r')
     json_data = json.load(fp)
     fp.close()
 
+    fp = open(DATA_PATH + '\\CVI_10001\\dataset_out5.json', 'r')
+    output_json = json.load(fp)
+    fp.close()
+
+    start_id = 18
+    count = len(output_json) + 1
+
     for i, slice in enumerate(json_data):
+        if i < start_id:
+            # start from last processed id
+            continue
+
         if slice['label'] != '':
+            output_json.append(slice)
             continue
 
         try:
             # print('\n' + slice['slice'].replace('$vulchecker_output = ', 'echo '))
-            print('\n-------------------------' + slice['file_name'] + '----------------------------\n')
-            fp = open(DATA_PATH+'\\CVI_10001\\dataset_out5.json', 'w')
+            print('\n-------------------------' + slice['file_name'] + ' ' + str(
+                slice['id']) + '----------------------------\n')
+            fp = open(DATA_PATH + '\\CVI_10001\\dataset_out5.json', 'w')
 
             code = slice['slice']
 
-            label = Chat_Code(code, Describe)
+            label = Chat_Code(code, Describe, Model="gpt-3.5-turbo")
 
             if label in ['safe', "Safe", "'safe'"]:
                 GPT_label = 'safe'
-                if slice['slice_label'] == 'bad':
-                    check = input("check:")
-                    if check != '':
-                        GPT_label = check
             elif label in ['vulnerable', "Vulnerable", "'vulnerable'"]:
                 GPT_label = 'vulnerable'
-                if slice['slice_label'] == 'good':
-                    check = input("check:")
-                    if check != '':
-                        GPT_label = check
-            elif label in ['unknown', "Unknown", "'unknown"]:
-                GPT_label = 'unknown'
-                check = input("check:")
-                if check != '':
-                    GPT_label = check
-            else:
-                GPT_label = input("input label:")
 
-            json_data[i]['label'] = GPT_label
+            check = input("check:")
+            if check != '':
+                if check == '0':
+                    GPT_label = 'safe'
+                elif check == '1':
+                    GPT_label = 'vulnerable'
+                else:
+                    # drop this slice
+                    continue
 
-            output_data = json.dumps(json_data)
+            slice['label'] = GPT_label
+            slice['id'] = count
+            output_json.append(slice)
+            count += 1
+
+            print(r'code_one_line: {}'.format(code.replace('\n', '\\n')), end='')
+            counter_sample = input("\ncounter_sample: \n")
+            counter_sample = counter_sample.replace('\\n', '\n')
+
+            if counter_sample != '':
+                new_slice = copy.deepcopy(slice)
+                new_slice['slice'] = counter_sample
+                new_slice['id'] = count
+
+                if GPT_label == 'safe':
+                    new_slice['label'] = 'vulnerable'
+                else:
+                    new_slice['label'] = 'safe'
+
+                new_slice['message'] = 'synthesis'
+                output_json.append(new_slice)
+                count += 1
+
+            output_data = json.dumps(output_json)
             fp.write(output_data)
 
-            sleep(1)
         except:
-            output_data = json.dumps(json_data)
+            output_data = json.dumps(output_json)
             fp.write(output_data)
             break
     fp.close()
 
 
+def mark_label_SARD_sample(slice):
+    global thread_slices_receive
 
-def mark_label_SARD_sample():
     Describe = "Your identity is an expert proficient in PHP. " \
-               "Please replace the variable names in the following PHP code with more reasonable names, " \
-               "and do not use named and sanitized names." \
+               "Please replace the variable names in the following PHP code with more reasonable names. " \
+               "Do not include 'tained' and 'sanitized' in the variable names. " \
                "Please only return PHP code."
 
-    fp = open(DATA_PATH+'/SARD/SARD_php_vulnerability.json', 'r')
+    if slice['renamed_code'] != '':
+        thread_slices_receive.append(slice)
+        return
+
+    try:
+        # # print('\n' + slice['slice'].replace('$vulchecker_output = ', 'echo '))
+        # print('\n-------------------------' + slice['file_name'] + '----------------------------\n')
+
+        code = slice['code'] + '?>\n'
+
+        renamed_code = Chat_Code(code, Describe)
+
+        renamed_code = check_comment(renamed_code, check_inner_content=False)
+        renamed_code = clear_slice(renamed_code)
+
+        if not renamed_code.startswith('<?php'):
+            renamed_code = ''
+
+        slice['renamed_code'] = renamed_code
+        thread_slices_receive.append(slice)
+    except:
+        thread_slices_receive.append(slice)
+
+    return
+
+
+def mark_label_SARD_sample_mthread(cut=8):
+    global thread_slices_receive
+    fp = open(DATA_PATH + '/SARD/SARD_php_vulnerability.json', 'r')
+    json_data = json.load(fp)
+    fp.close()
+
+    leng = ceil(len(json_data) / cut)
+
+    for i in tqdm(range(leng)):
+        t1 = time.time()
+        fp = open(DATA_PATH + '/SARD/SARD_php_vulnerability.json', 'w')
+
+        slices = json_data[i * cut:i * cut + cut]
+
+        threading_list = []
+        thread_slices_receive = []
+        for l in range(cut):
+            t = threading.Thread(target=mark_label_SARD_sample, args=(slices[l],))
+            t.start()
+            threading_list.append(t)
+        for t in threading_list:
+            t.join()
+
+        thread_slices_receive = sorted(thread_slices_receive, key=operator.itemgetter('id'))
+        for l in range(cut):
+            json_data[i * cut + l] = thread_slices_receive[l]
+
+        output_data = json.dumps(json_data)
+        fp.write(output_data)
+        fp.close()
+
+        t2 = time.time()
+        if t2 - t1 < 1.5:
+            sleep(1)
+
+    fp.close()
+
+
+def check_Crossvul_label():
+    fp = open(DATA_PATH + '\\CVI_10001\\dataset_out5.json', 'r')
     json_data = json.load(fp)
     fp.close()
 
     for i, slice in enumerate(json_data):
-        if slice['renamed_code'] != '':
-            continue
+        # print('\n' + slice['slice'].replace('$vulchecker_output = ', 'echo '))
+        print('\n-------------------------' + slice['file_name'] + '----------------------------\n')
+        code = slice['slice']
+        label = slice['label']
 
-        try:
-            # # print('\n' + slice['slice'].replace('$vulchecker_output = ', 'echo '))
-            # print('\n-------------------------' + slice['file_name'] + '----------------------------\n')
-            t1 = time.time()
-            fp = open(DATA_PATH+'/SARD/SARD_php_vulnerability.json', 'w')
+        print(code)
+        print('LABEL: ', label)
 
-            code = slice['slice']
+        check = input("check:")
+        if check != '':
+            label = check
 
-            renamed_code = Chat_Code(code, Describe)
+        json_data[i]['label'] = label
 
-            renamed_code = check_comment(renamed_code, check_inner_content=False)
-            renamed_code = clear_slice(renamed_code)
-
-            json_data[i]['renamed_code'] = renamed_code
-
-            output_data = json.dumps(json_data)
-            fp.write(output_data)
-            fp.close()
-
-            t2 = time.time()
-            if t2 - t1 < 0.5:
-                sleep(1)
-        except:
-            output_data = json.dumps(json_data)
-            fp.write(output_data)
-            break
+    fp = open(DATA_PATH + '\\CVI_10001\\dataset_out5.json', 'w')
+    output_data = json.dumps(json_data)
+    fp.write(output_data)
     fp.close()
 
 
 if __name__ == '__main__':
-    mark_label_SARD_sample()
 
-#     code = """<?php
-# // controlable parameters:
+    mark_label_Crossvul_sample()
+
+#     code = """
+# def eval_codellama_model(eval_dataset, new_model_path, base_model_path):
+#     model = AutoModelForSequenceClassification.from_pretrained(
+#     base_model_path,
+#     device_map="auto",
+#     num_labels=2,
+#     torch_dtype=torch.float16)
+#     lora_model = PeftModel.from_pretrained(model, new_model_path, torch_dtype=torch.float16)
+#     lora_model = lora_model.merge_and_unload()
+#     lora_model.eval()
 #
-# // php code:
-# 		if( !empty($_GET['dir']) ){
-# 			echo ' <input type="hidden" name="dir" value="'.htmlspecialchars($_GET['dir']).'" />'		//sink point here.;
-# 		}"""
+#     with torch.no_grad():
+#         tr_data = DataLoader(eval_dataset, batch_size=1, shuffle=False)
+#         device = torch.device('cuda')
+#         for step, batch in enumerate(tqdm(tr_data)):
+#             batch = tuple(batch[t].to(device) for t in batch)
+#             b_input_ids, b_input_mask, b_labels = batch
 #
+#             test_output = lora_model(b_input_ids,
+#                                      attention_mask=b_input_mask)
+#             t = test_output.logits[0].cpu().numpy()
+#             eval_predictions = torch.argmax(test_output.logits, dim=1).tolist()[0]
+#
+#             """
+#
+#     Describe = "请作为大语言模型的专家，帮我分析这里给出的主要部分的代码是否有问题。" \
+#                "这里我加载微调过的codellama模型，并测试其语句分类性能。" \
+#                "但是现在在模型加载的部分似乎有问题，模型分类的输出结果基本上都是positive。但是如果我加载这个微调过的模型继续训练，模型似乎能正确加载，分类正确率很高。"
 #     try:
-#         Chat_Code(code)
+#         Chat_Code(code, Describe)
 #
 #     except:
 #         print('failed')

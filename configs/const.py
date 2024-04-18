@@ -25,6 +25,7 @@ INPUT_VARIABLES = [
     '$_REQUEST',
     '$_COOKIE',
     '$_FILES',
+    #'$_SESSION',
     '$HTTP_POST_FILES',
     '$HTTP_COOKIE_VARS',
     '$HTTP_REQUEST_VARS',

@@ -1,5 +1,5 @@
 from phply import phpast as php
-from utils.utils import match_pair
+from utils.utils import match_pair, match_str
 from utils.log import logger
 
 class Flow:
@@ -16,6 +16,10 @@ class Flow:
         self.flag = 0
         self.code = ""
         self.self_code = ""
+        self.last_flow = 0
+
+    def set_last_flow(self):
+        self.last_flow = 1
 
     def set_flag(self):
         self.flag = 1
@@ -24,7 +28,8 @@ class Flow:
         self.flag = 0
 
     def clear_flag(self):
-        self.flag =0
+        self.flag = 0
+        self.last_flow = 0
         if self.subnode.__class__.__name__ == 'list':
             for flow in self.subnode:
                 flow.clear_flag()
@@ -213,14 +218,15 @@ class Flow:
             lr_pos = match_pair(all_code, '(', ')')
             if not lr_pos:
                 logger.error("[ERROR] Flow.set_base_flow(): 1")
-                return None
+                raise Exception
 
             l_pos, r_pos = lr_pos[0], lr_pos[1]
 
         # match 'else ...; ...'
         if match_line:
+            end_p = match_str(all_code[r_pos:], ';')
             l_pos = r_pos + realm_sp
-            r_pos = all_code_position[-1]['position'][1]
+            r_pos = end_p + l_pos
             self.set_inner_sp(l_pos+1)
             self.set_inner_ep(r_pos)
 
@@ -229,7 +235,7 @@ class Flow:
             lr_pos = match_pair(all_code[r_pos:], '{', '}')
             if not lr_pos:
                 logger.error("[ERROR] Flow.set_base_flow(): 2")
-                return None
+                raise Exception
             l_pos, r_pos = lr_pos[0] + r_pos, lr_pos[1] + r_pos
             l_pos, r_pos = l_pos + realm_sp, r_pos + realm_sp
             self.set_inner_sp(l_pos+1)

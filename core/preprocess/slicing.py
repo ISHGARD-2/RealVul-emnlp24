@@ -47,7 +47,14 @@ class Slicing:
 
         slice = self.slice_func(func, mode)
 
-        if slice is None or not slice_filter(slice) or not slice_input_check(slice):
+        if slice is None:
+            logger.debug('[SLICE] slice too long\n')
+            return None
+        if not slice_filter(slice):
+            logger.debug('[SLICE] slice not support\n')
+            return None
+        if not slice_input_check(slice):
+            logger.debug('[SLICE] no input in slice\n')
             return None
 
         return slice
@@ -77,6 +84,7 @@ class Slicing:
             para_list += new_para
 
             origin_pos = self.origin_postion(func, new_para)
+
             new_para = self.subnode_scan(func, control_flow, origin_pos, isfunc=isfunc)
             pass
 
@@ -90,6 +98,7 @@ class Slicing:
             for func_p in func_params:
                 func_p_name = func_p.name
                 for par in para_list:
+                    par = par['name']
                     if par == func_p_name:
                         control_params.append(func_p_name)
                         break
@@ -133,8 +142,11 @@ class Slicing:
 
 
     def subnode_scan(self, func, control_flow, origin_pos, isfunc=False):
+        """
+        isfunc: slice from a function
+        """
         global para_list
-        new_param = set()
+        new_param = []
         sub_flow = control_flow.subnode
 
         # self_check
@@ -146,21 +158,37 @@ class Slicing:
             var_ep = var['position'][1]
             var_last = var['last']
             if all_sp <= var_sp and var_ep <= all_ep:
-                if not var_last and \
-                        control_flow.name == 'others' and \
+                if not var_last and control_flow.name == 'others' and \
                         not self.data_flow_analysis(control_flow.subnode, para_list, control_flow.self_code):
                     continue
                 # set_flag
                 control_flow.set_flag()
+                if var_last and control_flow.name == 'others':
+                    control_flow.set_last_flow()
                 break
+
+        if control_flow.last_flow:
+            return []
 
         # new params
         if control_flow.flag and not isfunc:
             params = self.single_rule.main(control_flow.self_code)
             if params:
                 for p in params:
-                    if p not in para_list and p not in INPUT_VARIABLES:
-                        new_param.add(p)
+                    append = True
+                    for new_p in new_param:
+                        if new_p['name'] == p:
+                            append = False
+                            break
+                    if append:
+                        for tmp_p in para_list:
+                            if tmp_p['name'] == p:
+                                append = False
+                                break
+
+                    if append and p not in INPUT_VARIABLES:
+                        new_p = {'name':p, 'lineno':control_flow.lineno}
+                        new_param.append(new_p)
 
         # subnode mark
         if control_flow.name != 'others':
@@ -168,8 +196,19 @@ class Slicing:
                 if flow.lineno <= self.line_number:
                     params = self.subnode_scan(func, flow, origin_pos)
                     for p in params:
-                        if p not in para_list and p not in INPUT_VARIABLES:
-                            new_param.add(p)
+                        append = True
+                        for new_p in new_param:
+                            if new_p['name'] == p['name']:
+                                append = False
+                                break
+                        if append:
+                            for tmp_p in para_list:
+                                if tmp_p['name'] == p['name']:
+                                    append = False
+                                    break
+
+                        if append and p['name'] not in INPUT_VARIABLES:
+                            new_param.append(p)
 
             clear_flag = True
             for i, flow in enumerate(sub_flow):
@@ -181,7 +220,7 @@ class Slicing:
                 control_flow.set_flag0()
                 new_param = []
 
-        return list(new_param)
+        return new_param
 
     def data_flow_analysis(self, node, params, code):
         vars = []
@@ -201,8 +240,9 @@ class Slicing:
             return True
 
         for v in vars:
-            if v in params:
-                return True
+            for p in params:
+                if p['name'] == v:
+                    return True
         return False
 
     def origin_postion(self, func, para_list):
@@ -216,14 +256,17 @@ class Slicing:
             vars = self.single_rule.main(code, with_position=True)
             if vars:
                 line_vars, positions = vars[0], vars[1]
-                for para in para_list:
+                for param in para_list:
+                    para = param['name']
+                    para_lineno = param['lineno']
                     for var, pos in zip(line_vars, positions):
+
                         if var == para:
                             if i >= len(func.code_line):
                                 logger.error("[ERROR] params origin_postion(): func code_lineno match error")
 
 
-                            if lineno <= self.line_number:
+                            if lineno <= para_lineno:
                                 last = False
                                 if lineno == self.line_number:
                                     last = True
