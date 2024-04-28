@@ -64,21 +64,21 @@ optim = "paged_adamw_32bit"
 # lr_scheduler_type = "constant"
 
 # Number of training steps (overrides num_train_epochs)
-max_steps = 200
+max_steps = 300
 
 # Ratio of steps for a linear warmup (from 0 to learning rate)
 # warmup_ratio = 0.01
-warmup_steps = 25
+warmup_steps = 50
 
 # Group sequences into batches with same length
 # Saves memory and speeds up training considerably
 group_by_length = True
 
 # Save checkpoint every X updates steps
-save_steps = 25
+save_steps = 50
 
 # Log every X updates steps
-logging_steps = 25
+logging_steps = 5
 
 ################################################################################
 # SFT parameters
@@ -92,4 +92,12 @@ packing = False
 
 # Load the entire model on the GPU 0
 device_map = "auto"
+
+
+#########################################
+# for code t5+
+############################################
+# batch_size = 4
+# device = 'cuda:1'
+# T5_max_length = 512
 

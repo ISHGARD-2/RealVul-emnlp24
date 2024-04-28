@@ -96,7 +96,7 @@ class Pretreatment:
                 self.pre_result[filepath]['ast_nodes'] = all_nodes
 
             except SyntaxError as e:
-                logger.warning('[AST] [ERROR] parser {}:{} SyntaxError or phply not support'.format(filepath, str(e.lineno)))
+                #logger.warning('[AST] [ERROR] parser {}:{} SyntaxError or phply not support'.format(filepath, str(e.lineno)))
                 continue
 
             except AssertionError as e:

@@ -78,11 +78,11 @@ def collect_SARD():
                         id += 1
                         json_sample['id'] = id
                         json_sample['file_id'] = file_id
-                        json_sample['state'] = state
-                        json_sample['code'] = php_code
+                        json_sample['label'] = state
+                        json_sample['slice'] = php_code
                         json_sample['file_name'] = php_file_name
                         json_sample['CWE'] = CWE
-                        json_sample['renamed_code'] = ''
+                        json_sample['renamed_slice'] = ''
 
                         json_data.append(json_sample)
 

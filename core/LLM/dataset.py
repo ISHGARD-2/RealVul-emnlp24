@@ -1,4 +1,5 @@
 import json
+import operator
 import random
 import logging
 from tqdm import tqdm
@@ -10,7 +11,6 @@ import csv
 from utils.func_json import read_json, write_json, json_to_csv
 from random import shuffle
 from transformers import AutoTokenizer
-from configs.settings import LLM_ENV_PATH
 import train_const as my_c
 
 MAX_INPUT_LEN = 1024
@@ -37,7 +37,7 @@ class TextClassificationDataset(Dataset):
         }
 
 
-def get_tokenized_dataset(data, tokenizer, text_str="renamed_code", label_str="state"):
+def get_tokenized_dataset(data, tokenizer, text_str="renamed_slice", label_str="label"):
     new_dic = {"text": [], "labels": []}
 
     for slice in data:
@@ -69,71 +69,105 @@ def get_tokenized_dataset(data, tokenizer, text_str="renamed_code", label_str="s
     return dataset
 
 
-def get_data(data_path, base_model_path):
-    data = read_json(data_path)
-    shuffle(data)
+# def get_data(data_path, base_model_path):
+#     data = read_json(data_path)
+#     shuffle(data)
+#
+#     dis = int(len(data) / 8) * 7
+#     train_data, test_data = data[:dis], data[dis:]
+#
+#     # Load LLaMA tokenizer
+#     tokenizer = AutoTokenizer.from_pretrained(
+#         base_model_path,
+#         trust_remote_code=True,
+#
+#     )
+#     tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+#     tokenizer.pad_token = tokenizer.eos_token
+#     tokenizer.padding_side = "right"
+#
+#     train_dataset = get_tokenized_dataset(train_data, tokenizer)
+#     test_dataset = get_tokenized_dataset(test_data, tokenizer)
+#
+#     # train_t = train_dataset.input_ids.tolist()
+#     # test_t = test_dataset.input_ids.tolist()
+#     return train_dataset, test_dataset, tokenizer
 
-    dis = int(len(data) / 8) * 7
-    train_data, test_data = data[:dis], data[dis:]
 
-    # Load LLaMA tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(
-        base_model_path,
-        trust_remote_code=True,
+def trans_crossvul_label(crossvul_data, rate):
+    corvul_len = len(crossvul_data)
+    train_len = int(corvul_len * (1-rate))
 
-    )
-    tokenizer.add_special_tokens({'pad_token': '[PAD]'})
-    tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.padding_side = "right"
+    crossvul_data = sorted(crossvul_data, key=operator.itemgetter('project_id'))
 
-    train_dataset = get_tokenized_dataset(train_data, tokenizer)
-    test_dataset = get_tokenized_dataset(test_data, tokenizer)
+    output_train_data = []
+    output_test_data = []
+    save_train_data = True
+    last_project_id = -1
 
-    # train_t = train_dataset.input_ids.tolist()
-    # test_t = test_dataset.input_ids.tolist()
-    return train_dataset, test_dataset, tokenizer
-
-
-def trans_crossvul_label(crossvul_data):
-    output_data = []
+    info = {'train_bad':0, 'train_good':0, 'test_bad':0, 'test_good':0}
     for i in range(len(crossvul_data)):
-        if crossvul_data[i]['label'] == 'vulnerable':
-            slice = {'renamed_code':crossvul_data[i]['slice'], "state":'bad'}
-            output_data.append(slice)
+        sample = crossvul_data[i]
+        project_id = sample['project_id']
 
+        if i>train_len and last_project_id !=  project_id:
+            save_train_data = False
+
+        if save_train_data:
+            if crossvul_data[i]['label'] == 'vulnerable':
+                slice = {'renamed_slice': crossvul_data[i]['renamed_slice'], "label": 'bad', 'file_name':crossvul_data[i]['file_name']}
+                output_train_data.append(slice)
+                info['train_bad'] += 1
+
+            else:
+                slice = {'renamed_slice': crossvul_data[i]['renamed_slice'], "label": 'good', 'file_name':crossvul_data[i]['file_name']}
+                output_train_data.append(slice)
+                info['train_good'] += 1
+            last_project_id = project_id
         else:
-            slice = {'renamed_code': crossvul_data[i]['slice'], "state": 'good'}
-            output_data.append(slice)
+            if crossvul_data[i]['label'] == 'vulnerable':
+                slice = {'renamed_slice': crossvul_data[i]['renamed_slice'], "label": 'bad', 'file_name':crossvul_data[i]['file_name']}
+                output_test_data.append(slice)
+                info['test_bad'] += 1
 
-    return output_data
+            else:
+                slice = {'renamed_slice': crossvul_data[i]['renamed_slice'], "label": 'good', 'file_name':crossvul_data[i]['file_name']}
+                output_test_data.append(slice)
+                info['test_good'] += 1
 
 
-def get_crossvul_data(data_path, crossvul_path, base_model_path, crossvul_path2=''):
-    data = read_json(data_path)
+    return output_train_data, output_test_data
+
+
+def get_crossvul_data(crossvul_path, base_model_path, rate = 0.15, SARD_data_path = '', synthesis_data_path=''):
+
     crossvul_data = read_json(crossvul_path)
-    crossvul_data = trans_crossvul_label(crossvul_data)
 
-    if crossvul_path2 != '':
-        data += crossvul_data
+    if synthesis_data_path != '':
+        synthesis_data = read_json(synthesis_data_path)
+        crossvul_data += synthesis_data
 
-        crossvul_data = read_json(crossvul_path2)
-        crossvul_data = trans_crossvul_label(crossvul_data)
-        shuffle(crossvul_data)
+    crossvul_train_data, crossvul_test_data = trans_crossvul_label(crossvul_data, rate)
 
-    train_data, test_data = data, crossvul_data
+    train_data, test_data = crossvul_train_data, crossvul_test_data
+    if SARD_data_path != '':
+        data = read_json(SARD_data_path)
+        train_data, test_data = data + train_data, test_data
+
     shuffle(train_data)
     shuffle(test_data)
 
+    test_data = test_data[:500]
     # Load LLaMA tokenizer
     tokenizer = AutoTokenizer.from_pretrained(
         base_model_path,
         trust_remote_code=True,
-
     )
     tokenizer.add_special_tokens({'pad_token': '[PAD]'})
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"
 
+    logger.info("[LLM] tokenizer initialized ...")
     train_dataset = get_tokenized_dataset(train_data, tokenizer)
     test_dataset = get_tokenized_dataset(test_data, tokenizer)
 

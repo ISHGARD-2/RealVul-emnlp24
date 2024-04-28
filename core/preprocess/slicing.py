@@ -1,3 +1,4 @@
+from configs.settings import MAX_SLICE_LENGTH
 from core.preprocess.pretreatment import get_var_by_ast
 from utils.file import clear_slice
 from utils.log import logger
@@ -5,7 +6,8 @@ import queue
 from phply import phpast as php
 from configs.const import INPUT_VARIABLES
 from utils.utils import slice_filter, slice_input_check
-
+from phply.phplex import lexer
+from phply.phpparse import make_parser
 
 class OneSlice:
     """
@@ -47,7 +49,10 @@ class Slicing:
 
         slice = self.slice_func(func, mode)
 
-        if slice is None:
+        if slice is None or self.code_content not in slice:
+            logger.debug('[SLICE] slice failed\n')
+            return None
+        if len(slice) > MAX_SLICE_LENGTH:
             logger.debug('[SLICE] slice too long\n')
             return None
         if not slice_filter(slice):
@@ -56,8 +61,29 @@ class Slicing:
         if not slice_input_check(slice):
             logger.debug('[SLICE] no input in slice\n')
             return None
+        if not self.slilce_check_syntax(slice):
+            return None
 
         return slice
+
+    def slilce_check_syntax(self, code):
+
+        try:
+            parser = make_parser()
+            all_nodes = parser.parse(code, debug=False, lexer=lexer.clone(), tracking=True)
+
+        except SyntaxError as e:
+            logger.warning('[SLICE] slice syntax error\n')
+            return False
+
+        except AssertionError as e:
+            logger.warning('[SLICE] slice error\n')
+            return False
+
+        except:
+            logger.warning('[SLICE] slice error\n')
+            return False
+        return True
 
     def slice_func(self, func, mode):
         global code_slice_flag, para_list
@@ -104,7 +130,7 @@ class Slicing:
                         break
             slice_pre += "// controlable parameters: \n"
             for i, var in enumerate(control_params):
-                slice_pre += var+" = $_GET('input"+str(i)+"');\n"
+                slice_pre += var+" = $_GET['input"+str(i)+"'];\n"
             slice_pre += '\n'
         # ...
 
@@ -294,7 +320,7 @@ class Slicing:
 
         if not find_func:
             if not root_func:
-                logger.error("[ERROR][SLICING] root_func not found : {}".format(self.code_content))
+                logger.info("[INFO][SLICING] root_func not found : {}".format(self.code_content))
                 return None
             find_func = root_func
 

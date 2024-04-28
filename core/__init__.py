@@ -5,6 +5,7 @@ import traceback
 
 import argparse
 
+from configs.settings import RESULT_PATH
 from utils.file import Directory
 from utils.log import log, logger
 from utils.utils import ParseArgs
@@ -56,8 +57,8 @@ def preprocess(args):
     func_call.main(mode)
 
     # scan
-
-    origin_vulns = scan(func_call, target_directory=target_directory, special_rules=pa.special_rules, files=files,
+    store_path = RESULT_PATH
+    scan(func_call, target_directory=target_directory, store_path=store_path, special_rules=pa.special_rules, files=func_call.files,
                         mode=mode)
 
 

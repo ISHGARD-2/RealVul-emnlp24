@@ -123,10 +123,8 @@ class Flow:
 
     def set_while_flow(self, node, func, start_pos, end_pos):
         while_flow = Flow("while", [], node.lineno)
-
         all_code_position = while_flow.get_all_code_position(func, start_pos, end_pos)
-        self_code_position = while_flow.get_self_code_position(func, all_code_position)
-        while_flow.set_flow_position(all_code_position, self_code_position)
+
 
 
         if node.node.__class__.__name__ == 'Block':
@@ -228,7 +226,7 @@ class Flow:
             l_pos = r_pos + realm_sp
             r_pos = end_p + l_pos
             self.set_inner_sp(l_pos+1)
-            self.set_inner_ep(r_pos)
+            self.set_inner_ep(r_pos+1)
 
         # match '... else {...}'
         else:
@@ -349,6 +347,8 @@ def control_flow_analysis(nodes, base_flow, func, start_pos0=None, end_pos0=None
         #
         # elif isinstance(node, php.Case):
 
+        elif isinstance(node, php.Class) or isinstance(node, php.Method) or isinstance(node, php.Function):
+            continue
         else:
             base_flow.set_others_flow(node, func, start_pos, end_pos)
 

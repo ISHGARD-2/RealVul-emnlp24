@@ -12,6 +12,8 @@ CORE_PATH = os.path.join(PROJECT_DIRECTORY, 'core')
 RULES_PATH = os.path.join(PROJECT_DIRECTORY, 'rules')
 CONFIG_PATH = os.path.join(PROJECT_DIRECTORY, 'configs')
 LOGS_PATH = os.path.join(PROJECT_DIRECTORY, 'logs')
+TMP_PATH = os.path.join(PROJECT_DIRECTORY, 'tmp')
+RESULT_PATH = os.path.join(PROJECT_DIRECTORY, 'result')
 if os.path.isdir(LOGS_PATH) is not True:
     os.mkdir(LOGS_PATH)
 DEFAULT_RESULT_PATH = LOGS_PATH
@@ -24,4 +26,5 @@ MAX_FILE_LENGTH = 30000
 
 
 # LLM PATH
-LLM_ENV_PATH = "/home/dcao/code/Python/LLM/CodeLlama/codellama-instruct-13b/"
+LLM_ENV_PATH = "/home/dcao/code/Python/LLM/CodeLlama/"
+

@@ -165,9 +165,10 @@ class FuncCall:
         logger.info('[FUNC_CALL][INFO] Reading files... ')
         threading_list = []
         for i, f_list in enumerate(split_lists):
-            t = threading.Thread(target=self.__fileinfo_save(f_list))
-            t.start()
+            t = threading.Thread(target=self.__fileinfo_save, args=[f_list])
             threading_list.append(t)
+        for t in threading_list:
+            t.start()
         for t in threading_list:
             t.join()
 
@@ -185,7 +186,7 @@ class FuncCall:
     def main(self, analysis_mode="test"):
         """
         function call collection
-        analysis_mode:train or test
+        analysis_mode:scan or test or synthesis
         """
         logger.info("[INFO] Collecting functions...")
         for file in tqdm(self.file_list):
@@ -201,7 +202,7 @@ class FuncCall:
             self.analysis_functions(nodes, [{"name": 'root', "type": None}], file, isroot=True)
             self.function_list += file.function_list
 
-        if analysis_mode != 'test':
+        if analysis_mode == 'scan':
             # function call analysis
             logger.info("[INFO] Collecting function calls...")
             for file in tqdm(self.file_list):
@@ -217,15 +218,32 @@ class FuncCall:
 
         # control flow of every function
         logger.info("[INFO] Generating control flows...")
+        new_file_list = []
         for func in tqdm(self.function_list):
             try:
                 base_flow = Flow("base", [], func.start_lineno)
                 isset = base_flow.set_base_flow(func.node_ast.nodes, func)
                 if not isset:
                     continue
-                func.set_control_flow(control_flow_analysis(func.node_ast.nodes, base_flow, func))
+
+                start_pos0 = None
+                end_pos0 = None
+                if hasattr(base_flow, 'inner_start_position'):
+                    start_pos0 = base_flow.inner_start_position
+                if hasattr(base_flow, 'inner_end_position'):
+                    end_pos0 = base_flow.inner_end_position
+                func.set_control_flow(control_flow_analysis(func.node_ast.nodes, base_flow, func, start_pos0=start_pos0, end_pos0=end_pos0))
+                new_file_list.append(func.file)
             except Exception as e:
                 continue
+        self.files[0][1]['list']=new_file_list
+
+        new_file_list = []
+        for file in self.file_list:
+            if file.file_path in self.files[0][1]['list']:
+                new_file_list.append(file)
+        self.file_list = new_file_list
+
         return
 
 

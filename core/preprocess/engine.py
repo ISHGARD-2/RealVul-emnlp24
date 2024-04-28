@@ -21,24 +21,22 @@ def scan_single(func_call, target_directory, single_rule, mode, files=None, is_u
         raise
 
 
-def scan(func_call, target_directory, special_rules=None, files=None, mode="test"):
+def scan(func_call, target_directory, store_path, special_rules=None, files=None, mode="test"):
     r = Rule()
     rules = r.rules(special_rules)
 
     find_vulnerabilities = []
 
-    def store(result):
-        # if result is not None and isinstance(result, list) is True:
-        #     for res in result:
-        #         res.file_path = res.file_path
-        #         find_vulnerabilities.append(res)
-        # else:
-        #     logger.debug('[SCAN] [STORE] Not found vulnerabilities on this rule!')
+    def store(result, store_path):
+        slices = json.dumps(result)
+        f = open(store_path, 'w')
+        f.write(slices)
+        f.close()
         return
 
-    async def start_scan(func_call, target_directory, rule, files):
+    def start_scan(func_call, target_directory, rule, files, store_path):
         result = scan_single(func_call, target_directory, rule, mode, files)
-        store(result)
+        store(result, store_path)
 
     if len(rules) == 0:
         logger.critical('no rules!')
@@ -64,13 +62,9 @@ def scan(func_call, target_directory, special_rules=None, files=None, mode="test
             language=rule.language
         ))
         # result = scan_single(target_directory, rule, files, language, tamper_name)
-        scan_list.append(start_scan(func_call, target_directory, rule, files))
+        store_path = store_path+single_rule+'_dataset.json'
+        start_scan(func_call, target_directory, rule, files, store_path)
         # store(result)
-
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(asyncio.gather(*scan_list))
-
-    loop.stop()
 
     return True
 
@@ -140,15 +134,12 @@ class SingleRule(object):
                 core = Core(self.func_call, self.target_directory, origin_vulnerability, self.sr, self.mode)
                 vul_slice = core.scan()
                 if vul_slice:
-                    if self.mode == 'test':
+                    if self.mode == 'test' or 'synthesis':
                         for s in vul_slice:
                             self.save_test_samples(s, origin_vulnerability[0])
 
-        slices = json.dumps(self.slices)
-        f = open(self.rule_data_path + '/dataset_raw4.json', 'w')
-        f.write(slices)
-        f.close()
-        return
+
+        return self.slices
 
     def save_test_samples(self, slice, file_path):
         """
@@ -188,8 +179,8 @@ class Core(object):
 
         self.target_directory = os.path.normpath(target_directory)
 
-        self.file_path = vulnerability_result[0].strip()
-        self.file_path = self.file_path[self.file_path.find('/') + 1:]
+        self.file_path = vulnerability_result[0].strip().replace('/', '\\')
+        self.file_path = self.file_path.split('\\')[-1]
         self.line_number = vulnerability_result[1]
         self.code_content = vulnerability_result[2]
 
@@ -214,15 +205,19 @@ class Core(object):
             return None
         params = list(set(params))
         # program slicing
-        logger.debug(
-            "{line1}[CVI-{cvi}][SLICING]{line2}".format(cvi=self.single_rule.svid, line1='-' * 30, line2='-' * 30))
-        logger.debug("""[CVI-{cvi}][SLICING] > File: `{file}:{line}` > Code: `{code}`""".format(
-            cvi=self.single_rule.svid, file=self.file_path,
-            line=self.line_number, code=self.code_content))
+
+        if self.mode != 'synthesis':
+            logger.debug(
+                "{line1}[CVI-{cvi}][SLICING]{line2}".format(cvi=self.single_rule.svid, line1='-' * 30, line2='-' * 30))
+            logger.debug("""[CVI-{cvi}][SLICING] > File: `{file}:{line}` > Code: `{code}`""".format(
+                cvi=self.single_rule.svid, file=self.file_path,
+                line=self.line_number, code=self.code_content))
 
         output_list=[]
         for param_name in params:
-            logger.debug('[AST] Param: `{0}`'.format(param_name))
+            if self.mode != 'synthesis':
+                logger.debug('[AST] Param: `{0}`'.format(param_name))
+
             para = {'name':param_name, 'lineno':int(self.line_number)}
             # make slice here
             slice = Slicing([para], self.func_call, self.target_directory, self.file_path, self.code_content,
@@ -230,41 +225,20 @@ class Core(object):
             vul_slice = slice.main(self.mode)
 
 
-            if not vul_slice or len(vul_slice) > MAX_SLICE_LENGTH:
+            if not vul_slice :
                 return None
 
-            slilce_check = self.slilce_check_syntax(vul_slice)
-
-            if not slilce_check or self.code_content not in vul_slice:
-                return None
 
             output = self.single_rule.complete_slice_end(vul_slice, self.code_content, para)
 
             if output:
             # logger.debug("[SLICING]\n{}\n".format(vul_slice))
-                logger.debug("[CVI-{cvi}] [SLICING]reslut: \n{vul_slice}\n".format(cvi=self.single_rule.svid, vul_slice=output))
+                if self.mode != 'synthesis':
+                    logger.debug("[CVI-{cvi}] [SLICING]reslut: \n{vul_slice}\n".format(cvi=self.single_rule.svid, vul_slice=output))
                 output_list.append(output)
         return output_list
 
 
-    def slilce_check_syntax(self, code):
-
-        try:
-            parser = make_parser()
-            all_nodes = parser.parse(code, debug=False, lexer=lexer.clone(), tracking=True)
-
-        except SyntaxError as e:
-            logger.warning('[SLICE] slice syntax error\n')
-            return False
-
-        except AssertionError as e:
-            logger.warning('[SLICE] slice error\n')
-            return False
-
-        except:
-            logger.warning('[SLICE] slice error\n')
-            return False
-        return True
 
     def get_stmt_param(self):
         """

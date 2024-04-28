@@ -7,7 +7,7 @@ ext_dict = {
 NEWLINE_FLAGS = ["<?php", "{", "}", ";"]
 
 # built in function names
-code = open(CONFIG_PATH+"/buildin_func.txt", "r", encoding="utf-8").read()
+code = open(CONFIG_PATH + "/buildin_func.txt", "r", encoding="utf-8").read()
 BUILTIN_FUNC = code.split('\n')
 
 REGEX = {
@@ -25,7 +25,7 @@ INPUT_VARIABLES = [
     '$_REQUEST',
     '$_COOKIE',
     '$_FILES',
-    #'$_SESSION',
+    # '$_SESSION',
     '$HTTP_POST_FILES',
     '$HTTP_COOKIE_VARS',
     '$HTTP_REQUEST_VARS',
@@ -42,5 +42,76 @@ NOT_SUPPORT_STRING = [
 
 ]
 SLICE_FILTER = [
-    ('CATCH', True)
+    ('CATCH', True),
+    ('catch', True),
+    ('switch', True)
+
 ]
+
+REG = {
+    'functions': r'(?:function\s+)(\w+)\s*\(',
+    'string': r"(?:['\"])(.*)(?:[\"'])",
+    'assign_string': r"({0}\s?=\s?[\"'](.*)(?:['\"]))",
+    'annotation': r"(#|\\\*|\/\/|\*)+",
+    'variable': r'(\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)',
+    # Need match
+    #    $url = $_GET['test'];
+    #    $url = $_POST['test'];
+    #    $url = $_REQUEST['test'];
+    #    $url = $_SERVER['user_agent'];
+    #    $v = trim($_GET['t']);
+    # Don't match
+    #    $url = $_SERVER
+    #    $url = $testsdf;
+    'assign_out_input': r'({0}\s?=\s?.*\$_[GET|POST|REQUEST|SERVER|COOKIE]+(?:\[))'
+}
+
+STRING_REPLACE_ELEMENT = [
+    '.php',
+    '<div', 'div>',
+    '<input', 'input>',
+    '<br', 'br>',
+    '<li', 'li>',
+    '<option', 'option>',
+    '<a', 'a>',
+    '<td', 'td>',
+    '<html', 'html>',
+    '<head', 'head>',
+    '<title', 'title>',
+    '<body', 'body',
+    '<p', 'p>',
+    '<img', 'img>',
+    '<span', 'span>',
+    '<ul', 'ul>',
+    '<ol', 'ol>',
+    '<table', 'table>',
+    '<tr', 'tr>',
+    '<form', 'formc>',
+    '<form', 'form>',
+    '<label', 'label>',
+    '<th', 'th>',
+    '<hr', 'hrc>',
+    '<hr', 'hr>',
+    '<style', 'style>',
+    '<script', 'script>',
+    '/>',
+    '&nbsp;',
+    '&lt;',
+    '&gt;',
+    '&amp;',
+    '&quot;',
+    '&apos;',
+    '&cent;',
+    '&pound;',
+    '&yen;',
+    '&euro;',
+    '&sect;',
+    '&copy;',
+    '&reg;',
+    '&reg;',
+    '&times;',
+    '&divide;'
+
+]
+
+SYNTHESIS_LEN = 200

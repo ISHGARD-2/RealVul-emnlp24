@@ -188,6 +188,9 @@ def check_end_line_elseif(content):
 
 
 def clear_slice(slice):
+    for char in ['{', '}']:
+        slice = slice.replace(char, char + '\n')
+
     slice_split = slice.split('\n')
     new_slice = ""
 
@@ -195,7 +198,7 @@ def clear_slice(slice):
     for line in slice_split:
         reserve = False
         for char in line:
-            if char not in [' ', '\t']:
+            if char not in [' ', '\t', '\r', '\f', '\v']:
                 reserve = True
         if reserve:
             new_slice += line + '\n'

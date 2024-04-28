@@ -5,9 +5,8 @@ from math import ceil
 from time import sleep
 
 import copy
-import openai
 import operator
-from openai import OpenAI
+
 
 import os
 
@@ -18,14 +17,16 @@ from utils.file import check_comment, clear_slice
 
 os.environ["http_proxy"] = 'http://127.0.0.1:10810'
 os.environ["https_proxy"] = 'http://127.0.0.1:10810'
+
+import openai
+from openai import OpenAI
 client = OpenAI(api_key='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')
 
 
-# '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'
 
 
 # 定义调用 ChatGPT 的函数
-def Chat_Code(Order, Describe, Model="gpt-4"):
+def Chat_Code(Order, Describe, Model="gpt-3.5-turbo"):
     '''
     Order：告诉 ChatGPT 如何处理数据的命令
     Model：使用的语言模型，默认使用 gpt-3.5-turbo
@@ -73,26 +74,26 @@ def Chat_Code(Order, Describe, Model="gpt-4"):
 
 
 def mark_label_Crossvul_sample():
-    Describe = """Your identity is a vulnerability mining expert proficient in PHP.
-You can analyze the PHP code I provided and check for XSS vulnerabilities.
-If you are very certain that there is an XSS vulnerability in this code, return vulnerable;
-Otherwise, return safe."""
+    Describe = """您的身份是精通PHP的漏洞挖掘专家。
+请只根据我给出的代码，假设所有用户定义函数都过滤了输入，不考虑上下文。
+判断是否一定存在由$_GET输入，并传递到echo输出，导致的XSS漏洞。
+请不要考虑是否存在风险，只考虑是否能确定漏洞一定存在。
+如果您非常确定此代码中存在XSS漏洞，请返回'vulnerable'；
+否则，请返回'safe'。"""
 
-    fp = open(DATA_PATH + '\\CVI_10001\\dataset_raw5.json', 'r')
+    fp = open(DATA_PATH + '\\CVI_10001\\dataset_out3.json', 'r')
     json_data = json.load(fp)
     fp.close()
 
-    fp = open(DATA_PATH + '\\CVI_10001\\dataset_out5.json', 'r')
-    output_json = json.load(fp)
-    fp.close()
+    output_json = []
 
-    start_id = 18
+    start_id = 0
     count = len(output_json) + 1
 
     for i, slice in enumerate(json_data):
-        if i < start_id:
-            # start from last processed id
-            continue
+        # if i < start_id:
+        #     # start from last processed id
+        #     continue
 
         if slice['label'] != '':
             output_json.append(slice)
@@ -102,9 +103,8 @@ Otherwise, return safe."""
             # print('\n' + slice['slice'].replace('$vulchecker_output = ', 'echo '))
             print('\n-------------------------' + slice['file_name'] + ' ' + str(
                 slice['id']) + '----------------------------\n')
-            fp = open(DATA_PATH + '\\CVI_10001\\dataset_out5.json', 'w')
 
-            code = slice['slice']
+            code = slice['renamed_slice']
 
             label = Chat_Code(code, Describe, Model="gpt-3.5-turbo")
 
@@ -112,44 +112,46 @@ Otherwise, return safe."""
                 GPT_label = 'safe'
             elif label in ['vulnerable', "Vulnerable", "'vulnerable'"]:
                 GPT_label = 'vulnerable'
-
-            check = input("check:")
-            if check != '':
-                if check == '0':
-                    GPT_label = 'safe'
-                elif check == '1':
-                    GPT_label = 'vulnerable'
-                else:
-                    # drop this slice
-                    continue
+            else:
+                check = input("check:")
+                if check != '':
+                    if check == '0':
+                        GPT_label = 'safe'
+                    elif check == '1':
+                        GPT_label = 'vulnerable'
+                    else:
+                        # drop this slice
+                        continue
 
             slice['label'] = GPT_label
             slice['id'] = count
             output_json.append(slice)
             count += 1
 
-            print(r'code_one_line: {}'.format(code.replace('\n', '\\n')), end='')
-            counter_sample = input("\ncounter_sample: \n")
-            counter_sample = counter_sample.replace('\\n', '\n')
+            # print(r'code_one_line: {}'.format(code.replace('\n', '\\n')), end='')
+            # counter_sample = input("\ncounter_sample: \n")
+            # counter_sample = counter_sample.replace('\\n', '\n')
+            #
+            # if counter_sample != '':
+            #     new_slice = copy.deepcopy(slice)
+            #     new_slice['slice'] = counter_sample
+            #     new_slice['id'] = count
+            #
+            #     if GPT_label == 'safe':
+            #         new_slice['label'] = 'vulnerable'
+            #     else:
+            #         new_slice['label'] = 'safe'
+            #
+            #     new_slice['message'] = 'synthesis'
+            #     output_json.append(new_slice)
+            #     count += 1
 
-            if counter_sample != '':
-                new_slice = copy.deepcopy(slice)
-                new_slice['slice'] = counter_sample
-                new_slice['id'] = count
-
-                if GPT_label == 'safe':
-                    new_slice['label'] = 'vulnerable'
-                else:
-                    new_slice['label'] = 'safe'
-
-                new_slice['message'] = 'synthesis'
-                output_json.append(new_slice)
-                count += 1
-
+            fp = open(DATA_PATH + '\\CVI_10001\\dataset_out3.json', 'w')
             output_data = json.dumps(output_json)
             fp.write(output_data)
 
         except:
+            fp = open(DATA_PATH + '\\CVI_10001\\dataset_out3.json', 'w')
             output_data = json.dumps(output_json)
             fp.write(output_data)
             break
@@ -252,6 +254,49 @@ def check_Crossvul_label():
     output_data = json.dumps(json_data)
     fp.write(output_data)
     fp.close()
+
+
+def add_vulnerable_Crossvul_sample():
+    fp = open(DATA_PATH + '\\CVI_10001\\dataset_out4.json', 'r')
+    json_data = json.load(fp)
+    fp.close()
+
+    start_id = 18
+    count = len(json_data) + 1
+    output_json = []
+
+    for i, slice in enumerate(json_data):
+        output_json.append(slice)
+        # print('\n' + slice['slice'].replace('$vulchecker_output = ', 'echo '))
+        print('\n-------------------------' + slice['file_name'] + ' ' + str(
+            slice['id']) + '----------------------------\n')
+
+        code = slice['slice']
+        label = slice['label']
+
+        if label == 'safe':
+            print('\n{}\n'.format(code))
+            print(r'code_one_line: {}'.format(code.replace('\n', '\\n')), end='')
+            counter_sample = input("\ncounter_sample: \n")
+            counter_sample = counter_sample.replace('\\n', '\n')
+
+            if counter_sample != '':
+                new_slice = copy.deepcopy(slice)
+                new_slice['slice'] = counter_sample
+                new_slice['id'] = count
+
+                if label == 'safe':
+                    new_slice['label'] = 'vulnerable'
+                else:
+                    new_slice['label'] = 'safe'
+
+                new_slice['message'] = 'synthesis'
+                output_json.append(new_slice)
+                count += 1
+
+    fp = open(DATA_PATH + '\\CVI_10001\\dataset_out5.json', 'w')
+    output_data = json.dumps(output_json)
+    fp.write(output_data)
 
 
 if __name__ == '__main__':

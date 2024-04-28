@@ -1,7 +1,8 @@
 
 import os
+import re
 
-from configs.const import NOT_SUPPORT_STRING, SLICE_FILTER, INPUT_VARIABLES
+from configs.const import NOT_SUPPORT_STRING, SLICE_FILTER, INPUT_VARIABLES, REG, STRING_REPLACE_ELEMENT
 from configs.settings import RULES_PATH
 
 from utils.log import logger
@@ -99,6 +100,37 @@ class ParseArgs(object):
             return target_directory
         else:
             return u'{t}/'.format(t=target_directory)
+
+def match_vars(regex_string, with_position=False):
+    """
+    regex string input
+    :regex_string: regex match string
+    :return:
+    """
+    reg = "\\$\\w+"
+    if re.search(reg, regex_string, re.I):
+        p = re.compile(reg)
+        match = p.findall(regex_string)
+        matchs = re.finditer(reg, regex_string)
+
+        match_out = []
+        positions = []
+
+        for i, mp in enumerate(matchs):
+            m = match[i]
+            lp = mp.start()
+            rp = mp.end()
+
+            if lp > 0 and regex_string[lp - 1] == '\\':
+                continue
+
+            match_out.append(m)
+            positions.append((lp, rp))
+
+        if with_position:
+            return [match_out, positions]
+        return match_out
+    return None
 
 
 def match_pair(str, left_str, right_str, instr=False):
@@ -228,6 +260,123 @@ def slice_filter(slice):
         if p >= 0:
             return False
     return True
+
+def replace_str(code, match_html=False):
+    new_code = ""
+
+    bracket_count = 0
+    string_count = 0
+
+    for i, char in enumerate(code):
+        # pass string
+        if string_count == 0 and char == '(' and bracket_count == 0:
+            pair_pos = match_pair(code[i:], '(', ')')
+            if pair_pos:
+                bracket_count = pair_pos[1] - pair_pos[0] + 1
+
+        if string_count == 0 and char == '[' and bracket_count == 0:
+            pair_pos = match_pair(code[i:], '[', ']')
+            if pair_pos:
+                bracket_count = pair_pos[1] - pair_pos[0] + 1
+
+        if bracket_count > 0:
+            bracket_count -= 1
+            new_code += char
+            continue
+
+        # pass string
+        if  char in ['"', '\''] and string_count == 0:
+            char_rep = char
+            pair_pos = match_pair(code[i:], char_rep, char_rep, instr=True)
+            if pair_pos:
+                s = code[i + pair_pos[0]:i + pair_pos[1] + 1]
+
+                replace_str = False
+                if match_html:
+                    for key in STRING_REPLACE_ELEMENT:
+                        if key in s:
+                            replace_str = True
+                            break
+                else:
+                    replace_str = True
+
+                params = match_vars(s)
+                if replace_str:
+                    if params is None:
+                        string_count = pair_pos[1] - pair_pos[0] + 1
+                        new_code += '\"\"'
+                    elif '$_GET' not in params:
+                        string_count = pair_pos[1] - pair_pos[0] + 1
+                        new_code += '\"'
+                        for p in params:
+                            new_code += '{}\" . \"'.format(p)
+                        new_code += '\"'
+                    else:
+                        string_count = pair_pos[1] - pair_pos[0] + 1
+                        new_code += '$_GET[\'input\']'
+                else:
+                    string_count = pair_pos[1] - pair_pos[0] + 1
+                    new_code += s
+
+        if string_count > 0:
+            string_count -= 1
+            continue
+
+        new_code += char
+
+    new_code = replace_pad(new_code)
+
+    if not match_html and '$taint' not in new_code and '$_GET' not in new_code:
+       return code
+
+    return new_code
+
+
+def replace_pad(code):
+    new_code = code
+    replace_list = [
+        '.\"\".', '. \"\" .',
+        '.\'\'.', '. \'\' .',
+        '._PAD_.', '. _PAD_ .',
+    ]
+    replace_echo_list=[
+        'echo \'\'.', 'echo \'\' .',
+        'echo \"\".', 'echo \"\" .',
+        'echo _PAD_.', 'echo _PAD_ .',
+    ]
+    replace_end_list = [
+        '.\'\';', '. \'\';',
+        '.\"\";', '. \"\";',
+        '._PAD_;', '._PAD_ ;',
+    ]
+
+    contain = False
+    for re in replace_list+replace_echo_list+replace_end_list:
+        if re in new_code:
+            contain = True
+            break
+
+    while contain:
+        for re in replace_list:
+            if re in new_code:
+                new_code = new_code.replace(re, '.')
+
+        for re in replace_echo_list:
+            if re in new_code:
+                new_code = new_code.replace(re, 'echo ')
+
+        for re in replace_end_list:
+            if re in new_code:
+                new_code = new_code.replace(re, ';')
+
+        contain = False
+        for re in replace_list+replace_echo_list+replace_end_list:
+            if re in new_code:
+                contain = True
+                break
+
+    return new_code
+
 
 
 if __name__=='__main__':
