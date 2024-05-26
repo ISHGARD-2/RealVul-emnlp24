@@ -3,26 +3,27 @@ import os
 
 from configs.const import INPUT_VARIABLES
 from configs.settings import DATA_PATH
+from utils.func_json import read_json, write_json
 from utils.utils import match_pair, replace_str
 from rules.php.CVI_10001 import CVI_10001
 
+FILE_PATH = os.path.join(DATA_PATH, 'SARD', 'SARD_php_vulnerability_89.json')
 
-FILE_PATH = DATA_PATH + '\\SARD\\SARD_php_vulnerability.json'
+FILTER_STR = ['$array[]', 'sprintf']
 
-def delete_useless_sample():
-    fp = open(FILE_PATH, 'r')
-    json_data = json.load(fp)
-    fp.close()
 
+def delete_useless_sample(json_data):
     count = 1
     output_data = []
     for i, slice in enumerate(json_data):
-        code = slice['renamed_code']
+        code = slice['slice']
 
         append = False
-        for var in INPUT_VARIABLES:
-            if var in code:
-                append = True
+        if "$_GET" in code:
+            append = True
+        for str in FILTER_STR:
+            if str in code:
+                append = False
                 break
 
         if append:
@@ -30,10 +31,8 @@ def delete_useless_sample():
             count += 1
             output_data.append(slice)
 
-    fp = open(FILE_PATH, 'w')
-    output_data = json.dumps(output_data)
-    fp.write(output_data)
-    fp.close()
+    return output_data
+
 
 def rename_input_vars():
     fp = open(FILE_PATH, 'r')
@@ -56,6 +55,7 @@ def rename_input_vars():
     fp.write(output_data)
     fp.close()
 
+
 def add_comment():
     fp = open(FILE_PATH, 'r')
     json_data = json.load(fp)
@@ -68,7 +68,7 @@ def add_comment():
         if lr_pos is None:
             exit()
         l_pos = lr_pos[0]
-        r_pos = lr_pos[1]+1
+        r_pos = lr_pos[1] + 1
 
         rule = CVI_10001()
         param = rule.main(code[l_pos: r_pos])
@@ -77,7 +77,7 @@ def add_comment():
             exit()
 
         str_list = list(code)
-        str_list.insert(r_pos, '\t\t//sink point: '+param[0]+';')
+        str_list.insert(r_pos, '\t\t//sink point: ' + param[0] + ';')
         new_code = ''.join(str_list)
         new_code = new_code.replace('<?php', '<?php\n// php code:')
 
@@ -158,7 +158,7 @@ def edit_sample_id():
     fp.close()
 
     for i, slice in enumerate(json_data):
-        json_data[i]['id'] = i+1
+        json_data[i]['id'] = i + 1
 
     fp = open(FILE_PATH, 'w')
     output_data = json.dumps(json_data)
@@ -166,8 +166,9 @@ def edit_sample_id():
     fp.close()
 
 
-
-
-
 if __name__ == '__main__':
-    edit_sample_id()
+    json_data = read_json(FILE_PATH)
+
+    output_data = delete_useless_sample(json_data)
+
+    write_json(output_data, FILE_PATH)

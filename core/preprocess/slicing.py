@@ -5,20 +5,31 @@ from utils.log import logger
 import queue
 from phply import phpast as php
 from configs.const import INPUT_VARIABLES
-from utils.utils import slice_filter, slice_input_check
-from phply.phplex import lexer
-from phply.phpparse import make_parser
+from utils.utils import slice_filter, slice_input_check, match_params, slilce_check_syntax
 
-class OneSlice:
-    """
-    param_name: str
-    func_call_tree: {}
-        callers:""
-    """
 
-    def __init__(self):
-        pass
+def get_slice_from_flow(flow, code_slice_flag, isroot=False):
+    if not isroot and not flow.flag:
+        return
 
+    if not isroot:
+        for self_code_line in flow.self_code_position:
+            for i in range(self_code_line['position'][0], self_code_line['position'][1]):
+                code_slice_flag[i] = 1
+
+    if flow.name != 'others':
+        for subflow in flow.subnode:
+            get_slice_from_flow(subflow, code_slice_flag)
+
+    if isroot:
+        code_slice = ''
+        base = flow.all_code_position[0]['position'][0]
+        for i, char in enumerate(flow.code):
+            if code_slice_flag[i + base]:
+                code_slice += char
+
+        return code_slice
+    return
 
 class Slicing:
     def __init__(self, params, func_call, target_directory, file_path, code_content, line_number, single_rule):
@@ -47,6 +58,7 @@ class Slicing:
         if not func:
             return None
 
+
         slice = self.slice_func(func, mode)
 
         if slice is None or self.code_content not in slice:
@@ -61,29 +73,10 @@ class Slicing:
         if not slice_input_check(slice):
             logger.debug('[SLICE] no input in slice\n')
             return None
-        if not self.slilce_check_syntax(slice):
+        if not slilce_check_syntax(slice):
             return None
 
         return slice
-
-    def slilce_check_syntax(self, code):
-
-        try:
-            parser = make_parser()
-            all_nodes = parser.parse(code, debug=False, lexer=lexer.clone(), tracking=True)
-
-        except SyntaxError as e:
-            logger.warning('[SLICE] slice syntax error\n')
-            return False
-
-        except AssertionError as e:
-            logger.warning('[SLICE] slice error\n')
-            return False
-
-        except:
-            logger.warning('[SLICE] slice error\n')
-            return False
-        return True
 
     def slice_func(self, func, mode):
         global code_slice_flag, para_list
@@ -107,14 +100,16 @@ class Slicing:
                 logger.error("[ERROR][Slincing] slice_func():  while iter error")
             while_count += 1
 
-            para_list += new_para
+            for p in new_para:
+                if p['name'] not in INPUT_VARIABLES:
+                    para_list.append(p)
 
             origin_pos = self.origin_postion(func, new_para)
 
             new_para = self.subnode_scan(func, control_flow, origin_pos, isfunc=isfunc)
             pass
 
-        code_slice = self.get_slice_from_flow(control_flow, True)
+        code_slice = get_slice_from_flow(control_flow, code_slice_flag, True)
 
         slice_pre = "<?php\n"
         # find params of function, trans to further function
@@ -141,29 +136,6 @@ class Slicing:
 
         return code_slice
 
-    def get_slice_from_flow(self, flow, isroot=False):
-        global code_slice_flag
-        if not isroot and not flow.flag:
-            return
-
-        if not isroot:
-            for self_code_line in flow.self_code_position:
-                for i in range(self_code_line['position'][0], self_code_line['position'][1]):
-                    code_slice_flag[i] = 1
-
-        if flow.name != 'others':
-            for subflow in flow.subnode:
-                self.get_slice_from_flow(subflow)
-
-        if isroot:
-            code_slice = ''
-            base = flow.all_code_position[0]['position'][0]
-            for i, char in enumerate(flow.code):
-                if code_slice_flag[i+base]:
-                    code_slice += char
-
-            return code_slice
-        return
 
 
 
@@ -198,7 +170,7 @@ class Slicing:
 
         # new params
         if control_flow.flag and not isfunc:
-            params = self.single_rule.main(control_flow.self_code)
+            params = match_params(control_flow.self_code)
             if params:
                 for p in params:
                     append = True
@@ -251,7 +223,7 @@ class Slicing:
     def data_flow_analysis(self, node, params, code):
         vars = []
         if isinstance(node, php.Assignment) or isinstance(node, php.AssignOp):
-            tvars = self.single_rule.main(code[:code.find('=')])
+            tvars = match_params(code[:code.find('=')])
             if tvars:
                 for v in tvars:
                     vars.append(v)
@@ -279,12 +251,14 @@ class Slicing:
             code = line['code']
             position = line['position']
             lineno = line['lineno']
-            vars = self.single_rule.main(code, with_position=True)
+            vars = match_params(code, with_position=True)
             if vars:
                 line_vars, positions = vars[0], vars[1]
                 for param in para_list:
                     para = param['name']
                     para_lineno = param['lineno']
+                    para_pos = []
+
                     for var, pos in zip(line_vars, positions):
 
                         if var == para:
@@ -303,7 +277,10 @@ class Slicing:
                                      "code": code,
                                      'last':last}
 
-                                origin_postions.append(p)
+                                para_pos.append(p)
+                    if param in INPUT_VARIABLES:
+                        para_pos = [para_pos[-1]]
+                    origin_postions += para_pos
 
         return origin_postions
 
@@ -325,3 +302,8 @@ class Slicing:
             find_func = root_func
 
         return find_func
+
+
+
+
+

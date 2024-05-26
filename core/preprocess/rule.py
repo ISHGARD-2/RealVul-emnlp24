@@ -43,7 +43,7 @@ class Rule(object):
 
         # 逐个处理每一种lan
         for lan in origin_lans:
-            self.rules_path = RULES_PATH + "/" + lan
+            self.rules_path = os.path.join( RULES_PATH , lan)
             if not os.path.exists(self.rules_path):
                 logger.error("[INIT][RULE] language {} can't found rules".format(self.rules_path))
                 os.mkdir(self.rules_path)

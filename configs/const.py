@@ -1,3 +1,5 @@
+import os.path
+
 from configs.settings import CONFIG_PATH
 
 ext_dict = {
@@ -7,12 +9,11 @@ ext_dict = {
 NEWLINE_FLAGS = ["<?php", "{", "}", ";"]
 
 # built in function names
-code = open(CONFIG_PATH + "/buildin_func.txt", "r", encoding="utf-8").read()
+code = open(os.path.join(CONFIG_PATH, 'buildin_func.txt'), "r", encoding="utf-8").read()
 BUILTIN_FUNC = code.split('\n')
 
 REGEX = {
     'functions': r'(?:function\s+)(\w+)\s*\(',
-    'string': r"(?:['\"])(.*)(?:[\"'])",
     'assign_string': r"({0}\s?=\s?[\"'](.*)(?:['\"]))",
     'annotation': r"(#|\\\*|\/\/|\*)+",
     'variable': r'(\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)',
@@ -54,15 +55,6 @@ REG = {
     'assign_string': r"({0}\s?=\s?[\"'](.*)(?:['\"]))",
     'annotation': r"(#|\\\*|\/\/|\*)+",
     'variable': r'(\$[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)',
-    # Need match
-    #    $url = $_GET['test'];
-    #    $url = $_POST['test'];
-    #    $url = $_REQUEST['test'];
-    #    $url = $_SERVER['user_agent'];
-    #    $v = trim($_GET['t']);
-    # Don't match
-    #    $url = $_SERVER
-    #    $url = $testsdf;
     'assign_out_input': r'({0}\s?=\s?.*\$_[GET|POST|REQUEST|SERVER|COOKIE]+(?:\[))'
 }
 
@@ -114,4 +106,7 @@ STRING_REPLACE_ELEMENT = [
 
 ]
 
-SYNTHESIS_LEN = 200
+SYNTHESIS_LEN = {
+    '79':200,
+    '89':250
+}

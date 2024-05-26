@@ -6,7 +6,7 @@ import re
 
 from tqdm import tqdm
 
-from configs.const import INPUT_VARIABLES
+from configs.const import INPUT_VARIABLES, SYNTHESIS_LEN
 from configs.settings import DATA_PATH
 from rules.php.CVI_10001 import CVI_10001
 from utils.log import logger
@@ -20,6 +20,8 @@ file_id = '_all'
 RAW_PATH = DATA_PATH + '\\CVI_10001\\dataset_raw'+str(file_id)+'.json'
 OUT_PATH = DATA_PATH + '\\CVI_10001\\dataset_out'+str(file_id)+'.json'
 OUT_UNIQUE_PATH = DATA_PATH + '\\CVI_10001\\dataset_out_all_unique.json'
+SYNTHESIS_PATH = DATA_PATH + '\\CVI_10001\\dataset_synthesis_79.json'
+TEST_PATH = DATA_PATH + '\\CVI_10001\\test_set\\dataset_test.json'
 
 def save_sample_to_file(path):
     fp = open(path, 'r')
@@ -38,14 +40,31 @@ def save_sample_to_file(path):
         fphp.write(raw_code)
         fphp.close()
 
-def edit_sample_id(path):
+def edit_sample_id(path, issynthesis=False):
     fp = open(path, 'r')
     json_data = json.load(fp)
     fp.close()
 
     for i, slice in enumerate(json_data):
-        json_data[i]['id'] = i+1
-        json_data[i]['project_id'] = int(slice['file_name'].split('_')[1])
+        if not issynthesis:
+            json_data[i]['id'] = i + 1
+            json_data[i]['CVE_database_id'] = int(slice['file_name'].split('_')[1])
+        else:
+            file_name = slice['file_name'].split('\\')[-1]
+            if 'SARD' in file_name:
+                raw_dataset = 'SARD'
+                raw_sample_id = int(file_name.split(raw_dataset)[1].split('_')[2])
+            elif 'crossvul' in file_name:
+                raw_dataset = 'crossvul'
+                raw_sample_id = int(file_name.split(raw_dataset)[1].split('_')[2])
+            else:
+                raise Exception
+
+            json_data[i]['id'] = i + 1
+            json_data[i]['file_name'] = file_name
+            json_data[i]['raw_dataset'] = raw_dataset
+            json_data[i]['raw_sample_id'] = raw_sample_id
+
 
 
     fp = open(path, 'w')
@@ -167,16 +186,16 @@ def rename_all_var_and_str():
     fp.close()
 
 
-def remove_similar_slice(threshold=0.95):
-    fp = open(OUT_PATH, 'r')
+def remove_similar_slice(in_path, out_path, threshold=0.95):
+    fp = open(in_path, 'r')
     json_data = json.load(fp)
     fp.close()
     data_list = {}
     for sample in json_data:
-        project_id = sample['project_id']
-        if str(project_id) not in data_list.keys():
-            data_list[str(project_id)] = []
-        data_list[str(project_id)].append(sample)
+        CVE_database_id = sample['CVE_database_id']
+        if str(CVE_database_id) not in data_list.keys():
+            data_list[str(CVE_database_id)] = []
+        data_list[str(CVE_database_id)].append(sample)
 
     output_data = []
     for key in tqdm(data_list):
@@ -202,11 +221,55 @@ def remove_similar_slice(threshold=0.95):
                 unique_samples.append(project[i])
 
         output_data += unique_samples
+        print('CVE_database_id: {v1}\traw_count: {v2}\tnow count: {v3}'.format(v1=str(key), v2=str(len(project)), v3=len(unique_samples)))
 
-    fp = open(OUT_UNIQUE_PATH, 'w')
+    fp = open(out_path, 'w')
     output_data = json.dumps(output_data)
     fp.write(output_data)
     fp.close()
+
+
+def gen_test_set(in_path, out_path):
+    fp = open(in_path, 'r')
+    json_data = json.load(fp)
+    fp.close()
+
+    data_list = []
+    for sample in json_data:
+        if len(sample['renamed_slice'] ) > SYNTHESIS_LEN or sample['CVE_database_id']>4500:
+            data_list.append(sample)
+
+    output_data = []
+    for key in tqdm(data_list):
+        project = data_list[key]
+        unique_samples = []
+        for i in range(len(project)):
+            sample = project[i]['renamed_slice']
+            sample = re.sub('\s|\t|\n','',sample)
+            label = project[i]['label']
+
+            unique = True
+            for j in range(len(unique_samples)):
+                sample_saved = unique_samples[j]['renamed_slice']
+                sample_saved = re.sub('\s|\t|\n', '', sample_saved)
+                label_saved = unique_samples[j]['label']
+
+                similarity = difflib.SequenceMatcher(None, sample, sample_saved).quick_ratio()
+                if similarity > threshold and label == label_saved:
+                    # print('#'*30 +'\n{v1}\n{v2}\n'.format(v1=project[i]['renamed_slice'], v2=unique_samples[j]['renamed_slice']))
+                    unique = False
+                    break
+            if unique:
+                unique_samples.append(project[i])
+
+        output_data += unique_samples
+        print('CVE_database_id: {v1}\traw_count: {v2}\tnow count: {v3}'.format(v1=str(key), v2=str(len(project)), v3=len(unique_samples)))
+
+    fp = open(out_path, 'w')
+    output_data = json.dumps(output_data)
+    fp.write(output_data)
+    fp.close()
+
 
 
 if __name__ == '__main__':
@@ -214,4 +277,5 @@ if __name__ == '__main__':
     # rename_all_var_and_str()
     # remove_similar_slice()
     # edit_sample_id(OUT_UNIQUE_PATH)
-    save_sample_to_file(OUT_UNIQUE_PATH)
+    # remove_similar_slice(SYNTHESIS_PATH, SYNTHESIS_PATH)
+    gen_test_set(SYNTHESIS_PATH, TEST_PATH)

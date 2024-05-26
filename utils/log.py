@@ -2,20 +2,17 @@
 import os
 import logging
 import colorlog
-from configs.settings import LOGS_PATH
+from configs.settings import LOGS_PATH, DEFAULT_LOG_PATH
 
 logger = logging.getLogger('ISHGARD')
 logger_console = logging.getLogger('ISHGARDConsoleLog')
 log_path = LOGS_PATH
 
 
-def log(loglevel):
+def log(loglevel, logfile=""):
     if os.path.isdir(log_path) is not True:
         os.mkdir(log_path, 0o755)
 
-
-    log_name = 'main'
-    logfile = os.path.join(log_path, log_name + '.log')
 
     handler = colorlog.StreamHandler()
     handler.setFormatter(
@@ -31,6 +28,9 @@ def log(loglevel):
             },
         )
     )
+
+    if logfile == "":
+        logfile = DEFAULT_LOG_PATH
     f = open(logfile, 'a+')
     handler2 = logging.StreamHandler(f)
     formatter = logging.Formatter(

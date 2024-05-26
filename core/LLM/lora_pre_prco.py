@@ -1,4 +1,4 @@
-import train_const as my_c
+from configs import train_const as my_c
 import torch
 from transformers import    BitsAndBytesConfig
 

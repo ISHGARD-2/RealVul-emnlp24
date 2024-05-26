@@ -194,7 +194,7 @@ def mark_label_SARD_sample(slice):
 
 def mark_label_SARD_sample_mthread(cut=8):
     global thread_slices_receive
-    fp = open(DATA_PATH + '/SARD/SARD_php_vulnerability.json', 'r')
+    fp = open(DATA_PATH + '/SARD/SARD_php_vulnerability_79.json', 'r')
     json_data = json.load(fp)
     fp.close()
 
@@ -202,7 +202,7 @@ def mark_label_SARD_sample_mthread(cut=8):
 
     for i in tqdm(range(leng)):
         t1 = time.time()
-        fp = open(DATA_PATH + '/SARD/SARD_php_vulnerability.json', 'w')
+        fp = open(DATA_PATH + '/SARD/SARD_php_vulnerability_79.json', 'w')
 
         slices = json_data[i * cut:i * cut + cut]
 

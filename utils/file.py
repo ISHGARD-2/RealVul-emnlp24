@@ -147,6 +147,7 @@ def check_end_line_brackets(content, chr):
 
 
 def check_end_line(content):
+    # ...;....; \n
     start_pos = match_str(content, ';', without_brackets=True)
     end_pos = match_str(content[start_pos + 1:], ';', without_brackets=True) + start_pos + 1
 
@@ -302,7 +303,7 @@ class FileParseAll:
 
         for ffile in file_list:
             file = ffile.full_code.split('\n')
-            filepath = ffile.target_directory +ffile.file_path
+            filepath = ffile.file_path
             line_number = 1
             i = 0
             content = ""
@@ -433,9 +434,6 @@ class Directory(object):
     def file_info(self, path, filename):
         # Statistic File Type Count
         file_name, file_extension = os.path.splitext(path)
-
-        # 当设定了lan时加入检查
-        # if file_extension.lower() in self.ext_list:
 
         self.type_nums.setdefault(file_extension.lower(), []).append(filename)
 

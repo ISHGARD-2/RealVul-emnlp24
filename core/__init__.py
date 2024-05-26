@@ -1,3 +1,4 @@
+import os.path
 import sys
 import time
 import logging
@@ -57,7 +58,7 @@ def preprocess(args):
     func_call.main(mode)
 
     # scan
-    store_path = RESULT_PATH
+    store_path = os.path.join(RESULT_PATH, 'snippet')
     scan(func_call, target_directory=target_directory, store_path=store_path, special_rules=pa.special_rules, files=func_call.files,
                         mode=mode)
 

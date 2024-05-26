@@ -2,10 +2,13 @@
 import os
 import re
 
-from configs.const import NOT_SUPPORT_STRING, SLICE_FILTER, INPUT_VARIABLES, REG, STRING_REPLACE_ELEMENT
+from configs.const import NOT_SUPPORT_STRING, SLICE_FILTER, INPUT_VARIABLES, REG, STRING_REPLACE_ELEMENT, REGEX
 from configs.settings import RULES_PATH
 
 from utils.log import logger
+
+from phply.phplex import lexer
+from phply.phpparse import make_parser
 
 TARGET_MODE_FILE = 'file'
 TARGET_MODE_FOLDER = 'folder'
@@ -17,7 +20,6 @@ class ParseArgs(object):
         self.formatter = formatter
         self.output = output if output else ""
         self.language = ['php']
-        logger.info("[INIT][PARSE_ARGS] Only one Language {}.".format(self.language))
         self.sid = a_sid
 
         if special_rules != None and special_rules != '':
@@ -56,7 +58,7 @@ class ParseArgs(object):
 
         for p in paths:
             try:
-                if name in os.listdir(RULES_PATH + "/" + p):
+                if name in os.listdir(os.path.join(RULES_PATH, p)):
                     return True
             except:
                 continue
@@ -96,10 +98,66 @@ class ParseArgs(object):
 
         logger.debug('[PARSE-ARGS] target directory: {directory}'.format(directory=target_directory))
         target_directory = os.path.abspath(target_directory)
-        if target_directory[-1] == '/':
-            return target_directory
-        else:
-            return u'{t}/'.format(t=target_directory)
+
+        return target_directory
+
+
+def replace_pad(code):
+    new_code = code
+    replace_list = [[
+        r"\.\s*((\_PAD\_)|(\"\")|(\'\'))\s*\.",
+        ".",
+        ],
+        [
+            r"echo\s*((\_PAD\_)|(\"\")|(\'\'))\s*\.",
+            "echo ",
+        ],
+        [
+            r"\.\s*((\_PAD\_)|(\"\")|(\'\'))\s*;",
+            ";",
+        ],
+        [
+            r"\s*((\_PAD\_)|(\"\")|(\'\'))\s*\.",
+            "",
+        ]
+    ]
+
+
+    contain = False
+    for regex in replace_list:
+        if re.search(regex[0], new_code, re.I):
+            contain = True
+            break
+
+    while contain:
+        for regex in replace_list:
+            new_code = re.sub(regex[0], regex[1], new_code)
+
+        contain = False
+        for regex in replace_list:
+            if re.search(regex[0], new_code, re.I):
+                contain = True
+                break
+
+    return new_code
+
+
+def slilce_check_syntax(code, log=True):
+
+    try:
+        parser = make_parser()
+        parser.parse(code, debug=False, lexer=lexer.clone(), tracking=True)
+
+    except SyntaxError as e:
+        if log:
+            logger.warning('[UTILS] slice syntax error\n')
+        return False
+
+    except:
+        if log:
+            logger.warning('[UTILS] slice error\n')
+        return False
+    return True
 
 def match_vars(regex_string, with_position=False):
     """
@@ -261,6 +319,37 @@ def slice_filter(slice):
             return False
     return True
 
+def match_params(regex_string, with_position=False):
+    """
+    regex string input
+    :regex_string: regex match string
+    :return:
+    """
+    reg = REGEX['variable']
+    if re.search(reg, regex_string, re.I):
+        p = re.compile(reg)
+        match = p.findall(regex_string)
+        matchs = re.finditer(reg, regex_string)
+
+        match_out = []
+        positions = []
+
+        for i, mp in enumerate(matchs):
+            m = match[i]
+            lp = mp.start()
+            rp = mp.end()
+
+            if lp > 0 and regex_string[lp - 1] == '\\':
+                continue
+
+            match_out.append(m)
+            positions.append((lp, rp))
+
+        if with_position:
+            return [match_out, positions]
+        return match_out
+    return None
+
 def replace_str(code, match_html=False):
     new_code = ""
 
@@ -326,56 +415,13 @@ def replace_str(code, match_html=False):
 
     new_code = replace_pad(new_code)
 
-    if not match_html and '$taint' not in new_code and '$_GET' not in new_code:
+    if not match_html and '$' not in new_code:
        return code
 
     return new_code
 
 
-def replace_pad(code):
-    new_code = code
-    replace_list = [
-        '.\"\".', '. \"\" .',
-        '.\'\'.', '. \'\' .',
-        '._PAD_.', '. _PAD_ .',
-    ]
-    replace_echo_list=[
-        'echo \'\'.', 'echo \'\' .',
-        'echo \"\".', 'echo \"\" .',
-        'echo _PAD_.', 'echo _PAD_ .',
-    ]
-    replace_end_list = [
-        '.\'\';', '. \'\';',
-        '.\"\";', '. \"\";',
-        '._PAD_;', '._PAD_ ;',
-    ]
 
-    contain = False
-    for re in replace_list+replace_echo_list+replace_end_list:
-        if re in new_code:
-            contain = True
-            break
-
-    while contain:
-        for re in replace_list:
-            if re in new_code:
-                new_code = new_code.replace(re, '.')
-
-        for re in replace_echo_list:
-            if re in new_code:
-                new_code = new_code.replace(re, 'echo ')
-
-        for re in replace_end_list:
-            if re in new_code:
-                new_code = new_code.replace(re, ';')
-
-        contain = False
-        for re in replace_list+replace_echo_list+replace_end_list:
-            if re in new_code:
-                contain = True
-                break
-
-    return new_code
 
 
 

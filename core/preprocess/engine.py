@@ -7,6 +7,8 @@ import traceback
 from phply.phplex import lexer
 from phply.phpparse import make_parser
 
+from utils.func_json import write_json
+from utils.utils import match_params
 from .rule import Rule
 from configs.settings import DATA_PATH, MAX_SLICE_LENGTH
 from utils.file import FileParseAll
@@ -25,26 +27,20 @@ def scan(func_call, target_directory, store_path, special_rules=None, files=None
     r = Rule()
     rules = r.rules(special_rules)
 
-    find_vulnerabilities = []
-
-    def store(result, store_path):
-        slices = json.dumps(result)
-        f = open(store_path, 'w')
-        f.write(slices)
-        f.close()
-        return
-
     def start_scan(func_call, target_directory, rule, files, store_path):
         result = scan_single(func_call, target_directory, rule, mode, files)
-        store(result, store_path)
+
+        if store_path != None:
+            write_json(result, store_path)
+
+        return result
 
     if len(rules) == 0:
         logger.critical('no rules!')
         return False
     logger.info('[PUSH] {rc} Rules'.format(rc=len(rules)))
-    push_rules = []
-    scan_list = []
 
+    results = {}
     for idx, single_rule in enumerate(sorted(rules.keys())):
 
         # init rule class
@@ -55,18 +51,18 @@ def scan(func_call, target_directory, store_path, special_rules=None, files=None
             logger.info('[CVI_{cvi}] [STATUS] OFF, CONTINUE...'.format(cvi=rule.svid))
             continue
         # SR(Single Rule)
-        logger.debug("""[PUSH] [CVI_{cvi}] {idx}.{vulnerability}({language})""".format(
+        logger.debug("""[PUSH] [CVI_{cvi}] {vulnerability}""".format(
             cvi=rule.svid,
-            idx=idx,
             vulnerability=rule.vulnerability,
-            language=rule.language
         ))
         # result = scan_single(target_directory, rule, files, language, tamper_name)
-        store_path = store_path+single_rule+'_dataset.json'
-        start_scan(func_call, target_directory, rule, files, store_path)
+        if store_path != None:
+            store_path = os.path.join(store_path, single_rule+'_dataset.json')
+        result = start_scan(func_call, target_directory, rule, files, store_path)
         # store(result)
+        results[rule.svid] = result
 
-    return True
+    return results
 
 
 class SingleRule(object):
@@ -82,7 +78,7 @@ class SingleRule(object):
 
         # process
         self.rule_id = self.sr.__class__.__name__
-        self.rule_data_path = DATA_PATH + '/' + self.rule_id
+        self.rule_data_path = os.path.join(DATA_PATH, self.rule_id)
         if os.path.isdir(self.rule_data_path) is not True:
             os.mkdir(self.rule_data_path)
 
@@ -147,7 +143,7 @@ class SingleRule(object):
         save code slices to ./data/{cvi-id}/
         """
         id = len(self.slices)
-        file_name = file_path.split('/')[-1]
+        file_name = file_path
         if file_name.startswith('good'):
             slice_label = 'good'
         else:
@@ -159,7 +155,30 @@ class SingleRule(object):
                    'file_name': file_name,
                    'rule': self.rule_id,
                    'label':'',
-                   'message':''}
+                   'message':'',
+                   }
+        if self.mode == 'synthesis':
+            if 'SARD' in file_name:
+                raw_dataset = 'SARD'
+                raw_sample_id = file_name.split(raw_dataset)[1].split('__')[2]
+            elif 'crossvul' in file_name:
+                raw_dataset = 'crossvul'
+                raw_sample_id = file_name.split(raw_dataset)[1].split('__')[2]
+                raw_sample_id = raw_sample_id.split('_')[1]
+            else:
+                raise Exception
+            label = file_name.split(raw_dataset)[1].split('__')[1]
+            CVE_database_id = file_name.split('__')[0].split('_')[1]
+
+            content['label'] = label
+            content['message'] = 'synthesis'
+            content['raw_sample_id'] = int(raw_sample_id)
+            content['CVE_database_id'] = int(CVE_database_id)
+
+        elif self.mode == 'test':
+            CVE_database_id = file_path.split('_')[1]
+            content['CVE_database_id'] = CVE_database_id
+
         self.slices.append(content)
 
 
@@ -179,8 +198,7 @@ class Core(object):
 
         self.target_directory = os.path.normpath(target_directory)
 
-        self.file_path = vulnerability_result[0].strip().replace('/', '\\')
-        self.file_path = self.file_path.split('\\')[-1]
+        self.file_path = vulnerability_result[0]
         self.line_number = vulnerability_result[1]
         self.code_content = vulnerability_result[2]
 
@@ -232,9 +250,9 @@ class Core(object):
             output = self.single_rule.complete_slice_end(vul_slice, self.code_content, para)
 
             if output:
-            # logger.debug("[SLICING]\n{}\n".format(vul_slice))
+                #logger.debug("[SLICING]\n{}\n".format(vul_slice))
                 if self.mode != 'synthesis':
-                    logger.debug("[CVI-{cvi}] [SLICING]reslut: \n{vul_slice}\n".format(cvi=self.single_rule.svid, vul_slice=output))
+                    logger.debug("[CVI-{cvi}] [SLICING]result: \n{vul_slice}\n".format(cvi=self.single_rule.svid, vul_slice=output))
                 output_list.append(output)
         return output_list
 
@@ -247,7 +265,7 @@ class Core(object):
         """
         params = None
         if self.single_rule is not None:
-            params = self.single_rule.main(self.code_content)
+            params = match_params(self.code_content)
 
         if params is None:
             logger.debug("[AST] Not matching variables...")

@@ -1,24 +1,23 @@
 import sys
 
 import logging
-from scipy.special import softmax
-from sklearn.metrics import accuracy_score
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import (
     AutoModelForSequenceClassification,
     TrainingArguments,
-    DataCollatorWithPadding, BatchEncoding, LlamaForSequenceClassification
+    DataCollatorWithPadding, LlamaForSequenceClassification
 )
-import train_const as my_c
+from configs.train_const import Codellama_7b_TrainConst as train_const
 from peft import LoraConfig, TaskType, PeftModel
 from trl import SFTTrainer
 
 from configs.settings import LLM_ENV_PATH, DATA_PATH, MODEL_PATH
 from core.LLM.dataset import  get_crossvul_data
 import torch
+
 from utils.log import logger, log
-from sklearn import metrics
+
 
 # metric = evaluate.load('accuracy')
 
@@ -37,9 +36,9 @@ class MyTrainer(SFTTrainer):
         Subclass and override for custom behavior.
         """
 
-        # data_path = DATA_PATH + '/SARD/SARD_php_vulnerability.json'
+        # data_path = DATA_PATH + '/SARD/SARD_php_vulnerability_79.json'
         # base_model_path = LLM_ENV_PATH + 'models/7b/'
-        # output_model_path = MODEL_PATH + '/output/codellama/test1/'
+        # output_model_path = MODEL_PATH + '/output/codellama-7b/test1/'
         # check_point_path = output_model_path + "checkpoint-400"
         # new_model_path = output_model_path + "tuned_model"
         #
@@ -93,15 +92,15 @@ def train_codellama_model(train_dataset, eval_dataset, tokenizer, base_model_pat
     model = LlamaForSequenceClassification.from_pretrained(
         base_model_path,
         num_labels=2,
-        device_map=my_c.device_map,
+        device_map=train_const.device_map,
         output_scores=True
     )
 
     # Load LoRA configuration
     peft_config = LoraConfig(
-        lora_alpha=my_c.lora_alpha,
-        lora_dropout=my_c.lora_dropout,
-        r=my_c.lora_r,
+        lora_alpha=train_const.lora_alpha,
+        lora_dropout=train_const.lora_dropout,
+        r=train_const.lora_r,
         bias="none",
         task_type=TaskType.SEQ_CLS,
     )
@@ -109,21 +108,19 @@ def train_codellama_model(train_dataset, eval_dataset, tokenizer, base_model_pat
     # Set training parameters
     training_arguments = TrainingArguments(
         output_dir=output_model_path,
-        num_train_epochs=my_c.num_train_epochs,
-        per_device_train_batch_size=my_c.per_device_train_batch_size,
-        gradient_accumulation_steps=my_c.gradient_accumulation_steps,
-        optim=my_c.optim,
-        save_steps=my_c.save_steps,
-        logging_steps=my_c.logging_steps,
-        learning_rate=my_c.learning_rate,
-        weight_decay=my_c.weight_decay,
-        fp16=my_c.fp16,
-        # bf16=my_c.bf16,
-        max_grad_norm=my_c.max_grad_norm,
-        max_steps=my_c.max_steps,
-        warmup_steps=my_c.warmup_steps,
-        group_by_length=my_c.group_by_length,
-        # lr_scheduler_type=my_c.lr_scheduler_type,
+        per_device_train_batch_size=train_const.per_device_train_batch_size,
+        gradient_accumulation_steps=train_const.gradient_accumulation_steps,
+        optim=train_const.optim,
+        save_steps=train_const.save_steps,
+        logging_steps=train_const.logging_steps,
+        learning_rate=train_const.learning_rate,
+        weight_decay=train_const.weight_decay,
+        fp16=train_const.fp16,
+        max_grad_norm=train_const.max_grad_norm,
+        num_train_epochs=train_const.num_train_epochs,
+        #max_steps=train_const.max_steps,
+        warmup_steps=train_const.warmup_steps,
+        group_by_length=train_const.group_by_length,
         report_to="none"
     )
     logger.info("\n[LLM] Tarining CodeLlama...")
@@ -134,7 +131,7 @@ def train_codellama_model(train_dataset, eval_dataset, tokenizer, base_model_pat
     trainer = MyTrainer(
         model=model,
         args=training_arguments,
-        max_seq_length=my_c.max_seq_length,
+        max_seq_length=train_const.max_seq_length,
         tokenizer=tokenizer,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
@@ -164,13 +161,14 @@ def train_codellama_model(train_dataset, eval_dataset, tokenizer, base_model_pat
 
 def eval_codellama_model(eval_dataset, tokenizer, new_model_path, base_model_path):
     logger.info("Start eval")
+    logger.info("checkpoint path: {}".format(new_model_path))
     logger.info("Load model")
 
     raw_data = eval_dataset.raw_data
     model = AutoModelForSequenceClassification.from_pretrained(
         base_model_path,
         num_labels=2,
-        device_map=my_c.device_map,
+        device_map=train_const.device_map,
         output_scores=True)
     lora_model = PeftModel.from_pretrained(model, new_model_path)
     lora_model = lora_model.merge_and_unload()
@@ -186,12 +184,13 @@ def eval_codellama_model(eval_dataset, tokenizer, new_model_path, base_model_pat
     result_list = []
     # TN FP FN TP
     evalmatrix = [0, 0, 0, 0]
+    count = 0
     sum = len(eval_dataset.labels.tolist())
     with torch.no_grad():
         tr_data = DataLoader(eval_dataset, batch_size=16, shuffle=False)
         device = torch.device('cuda')
         for step, batch in enumerate(tqdm(tr_data)):
-            text = raw_data['text'][step]
+            #text = raw_data['text'][step]
 
             batch = tuple(batch[t].to(device) for t in batch)
             b_input_ids, b_input_mask, b_labels = batch
@@ -203,7 +202,13 @@ def eval_codellama_model(eval_dataset, tokenizer, new_model_path, base_model_pat
 
             label = b_labels.tolist()
 
+
             for label, pred in zip(label, eval_predictions):
+                result = {'file_name': raw_data['file_name'][count], 'label': label, 'pred':pred}
+                text = raw_data['text'][count]
+                count += 1
+                result_list.append(result)
+
                 if label == 0 and pred == 0:
                     evalmatrix[0] += 1
                 elif label == 0 and pred == 1:
@@ -211,7 +216,7 @@ def eval_codellama_model(eval_dataset, tokenizer, new_model_path, base_model_pat
                     #logger.debug("\nSafe sample : \tpred error: 1\n{}".format(text))
                 elif label == 1 and pred == 0:
                     evalmatrix[2] += 1
-                    #logger.debug("\nVulnerable sample : \tpred error: 0\n{}".format(text))
+                    logger.debug("\nVulnerable sample : \tpred error: 0\n{}".format(text))
                 elif label == 1 and pred == 1:
                     evalmatrix[3] += 1
                     #logger.debug("\nVulnerable sample : \tpred correct: 1\n{}".format(text))
@@ -222,47 +227,74 @@ def eval_codellama_model(eval_dataset, tokenizer, new_model_path, base_model_pat
         tn=str(evalmatrix[0] / sum), fp=str(evalmatrix[1] / sum),
         fn=str(evalmatrix[2] / sum), tp=str(evalmatrix[3] / sum)))
 
+    accuracy_score = (evalmatrix[0] + evalmatrix[1]) / (evalmatrix[0] + evalmatrix[1] + evalmatrix[2] + evalmatrix[3])
+    precision_score = (evalmatrix[0]) / (evalmatrix[0] + evalmatrix[2])
+    recall_score = (evalmatrix[0]) / (evalmatrix[0] + evalmatrix[1])
+    F1_score = (2 * precision_score * recall_score) / (precision_score + recall_score)
+
+    logger.info('\nAccuracy: {Accuracy}\n\tRecall: {Recall}\tPrecision: {Precision}\n\tF1: {F1}\n\t:'.format(
+        Accuracy=str(accuracy_score),
+        Recall=str(recall_score),
+        Precision=str(precision_score),
+        F1=str(F1_score)))
     logger.info("over")
+
+
+
+
+    # TEST_PATH = DATA_PATH + '\\CVI_10001\\test_set\\dataset_test.json'
+    # OUT_PATH = DATA_PATH + '\\CVI_10001\\test_set\\dataset_my_out.json'
+    #
+    # fp = open(OUT_PATH, 'w')
+    # output_data = json.dumps(result_list)
+    # fp.write(output_data)
+    # fp.close()
+
+
 
 
 def main():
     log(logging.DEBUG)
 
-    SARD_data_path = DATA_PATH + '/SARD/SARD_php_vulnerability.json'
+    SARD_data_path = DATA_PATH + '/SARD/SARD_php_vulnerability_79.json'
     crossvul_data_path = DATA_PATH + '/CVI_10001/dataset_out_all_unique.json'
-    synthesis_data_path =  DATA_PATH + '/CVI_10001/dataset_synthesis.json'
+    synthesis_data_path =  DATA_PATH + '/CVI_10001/dataset_synthesis_79.json'
     # crossvul_path2 = DATA_PATH + '/CVI_10001/dataset_out4.json'
 
 
     # code llama
-    base_model_path = LLM_ENV_PATH + 'codellama-instruct-13b/models/7b/'
+    base_model_path = LLM_ENV_PATH + 'codellama-7b-instruct-13b/models/7b/'
 
-    test_id = 8
-    basemodel = 'codellama'
+    test_id = 9
+    basemodel = 'codellama-7b'
     output_model_path = MODEL_PATH + '/output/'+basemodel+'/test'+str(test_id)+'/'
     new_model_path = output_model_path + "tuned_model"
 
 
     # data
     #train_dataset, test_dataset, tokenizer = get_data(data_path, base_model_path)
-    train_dataset, test_dataset, tokenizer = get_crossvul_data(crossvul_data_path, base_model_path, SARD_data_path=SARD_data_path, synthesis_data_path=synthesis_data_path)
+    train_dataset, test_dataset, tokenizer = get_crossvul_data(
+        crossvul_data_path,
+        base_model_path,
+        SARD_data_path='',
+        synthesis_data_path=synthesis_data_path)
 
 
     #train
-    check_point_path = output_model_path + "checkpoint-200"
+    check_point_path = output_model_path + "checkpoint-300"
     # train_codellama_model(train_dataset, test_dataset, tokenizer,
     #                       base_model_path, output_model_path,
-    #                       check_point_path='')
+    #                       check_point_path=check_point_path)
 
 
     # test
-    eval_start = 50
-    eval_end = 300
-    for step in range(eval_start, eval_end+1, my_c.save_steps):
-        check_point_path = output_model_path + "checkpoint-"+str(step)
-        logger.info("checkpoint path: {}".format(check_point_path))
-
-        eval_codellama_model(test_dataset, tokenizer, check_point_path, base_model_path)
+    # eval_start = 450
+    # eval_end = 500
+    # for step in range(eval_start, eval_end+1, train_const.save_steps):
+    #     check_point_path = output_model_path + "checkpoint-"+str(step)
+    #
+    #     eval_codellama_model(test_dataset, tokenizer, check_point_path, base_model_path)
+    eval_codellama_model(test_dataset, tokenizer, new_model_path, base_model_path)
 
 
 if __name__ == '__main__':

@@ -1,5 +1,6 @@
 import copy
 import codecs
+import os.path
 import queue
 import threading
 
@@ -61,7 +62,7 @@ class FunctionInfo:
                 logger.warning("[ERROR] func_call.set_code_line_position(): code_line error")
 
             lineno = self.code_line[i]['lineno']
-            sp = len('\n'.join(file.code_content[:lineno-1]))
+            sp = len('\n'.join(file.code_content[:lineno - 1]))
             if lineno > 1:
                 sp += 1
             ep = sp + len(code) + 1
@@ -81,7 +82,7 @@ class FileInfo:
     file_path:str
     """
 
-    def __init__(self, file_path, target_directory):
+    def __init__(self, file_path, target_directory, input_mode='file', code=None):
         # output
         self.function_list = []
         self.include_list = []
@@ -92,10 +93,17 @@ class FileInfo:
         self.target_directory = target_directory
 
         # process
-        self.__file_process()
+        if input_mode == 'file':
+            self.__file_process()
+        elif input_mode == 'direct':
+            if code is None or code == "":
+                logger.debug("[FUNC] no input file")
+            self.code_content = code.split('\n')
+            self.full_code = code
 
     def __file_process(self):
-        file = codecs.open(self.target_directory + self.file_path, "r", encoding='utf-8', errors='ignore')
+        path = os.path.join(self.target_directory, self.file_path)
+        file = codecs.open(str(path), "r", encoding='utf-8', errors='ignore')
 
         # code format change
         code = file.read()
@@ -143,7 +151,10 @@ class FuncCall:
     self.call_graph:list+
     """
 
-    def __init__(self, target_directory, files):
+    def __init__(self, target_directory, files, input_mode='file', direct_input=None):
+        """
+        input_mode: file or direct
+        """
         # output
         self.function_list = []
         self.call_list = []
@@ -152,31 +163,59 @@ class FuncCall:
         self.target_directory = target_directory
         self.files = files
 
+        # direct input code
+        self.input_mode = input_mode
+        self.direct_input = direct_input
+
         # processing
+        if self.input_mode == 'direct' and self.direct_input is None:
+            logger.debug("[FUNC] direct input mode but no input code")
+
         self.__file_process()
+
 
     def __file_process(self):
         self.file_list = []
-        self.pfa = FileParseAll(self.files, self.target_directory)
 
-        leng = int(len(self.pfa.t_filelist)/20) + 19
-        split_lists = [self.pfa.t_filelist[x: x + leng] for x in range(0, len(self.pfa.t_filelist), leng)]
+        if self.input_mode == 'file':
+            self.pfa = FileParseAll(self.files, self.target_directory)
 
-        logger.info('[FUNC_CALL][INFO] Reading files... ')
-        threading_list = []
-        for i, f_list in enumerate(split_lists):
-            t = threading.Thread(target=self.__fileinfo_save, args=[f_list])
-            threading_list.append(t)
-        for t in threading_list:
-            t.start()
-        for t in threading_list:
-            t.join()
+            leng = int(len(self.pfa.t_filelist) / 20) + 19
+            split_lists = [self.pfa.t_filelist[x: x + leng] for x in range(0, len(self.pfa.t_filelist), leng)]
 
-        ast_object.init_pre(self.target_directory, self.files, self.file_list)
+            logger.info('[FUNC_CALL][INFO] Reading files... ')
+            threading_list = []
+            for i, f_list in enumerate(split_lists):
+                t = threading.Thread(target=self.__fileinfo_save, args=[f_list])
+                threading_list.append(t)
+            for t in threading_list:
+                t.start()
+            for t in threading_list:
+                t.join()
+
+        elif self.input_mode == 'direct':
+            self.pfa = FileParseAll(None, None)
+
+            # files mode json
+            for file in self.direct_input:
+                file_name = file['file_name']
+                code = file['code']
+                fi = FileInfo(file_name, self.target_directory, self.input_mode, code)
+
+                if not support_check(fi.full_code):
+                    continue
+                self.file_list.append(fi)
+
+        else:
+            logger.error("[FUNC] not support input mode")
+
+        ast_object.init_pre(self.target_directory, self.file_list)
         ast_object.pre_ast_all("php", is_unprecom=False)
 
     def __fileinfo_save(self, f_list):
         for file in f_list:
+            if file.startswith('\\'):
+                file = file[1:]
             fi = FileInfo(file, self.target_directory)
 
             if not support_check(fi.full_code):
@@ -189,7 +228,12 @@ class FuncCall:
         analysis_mode:scan or test or synthesis
         """
         logger.info("[INFO] Collecting functions...")
-        for file in tqdm(self.file_list):
+
+        if analysis_mode != 'synthesis':
+            iter = tqdm(self.file_list)
+        else:
+            iter = self.file_list
+        for file in iter:
             ast_object.clear_none_node(file.file_path)
             nodes = ast_object.get_nodes(file.file_path)
 
@@ -202,24 +246,31 @@ class FuncCall:
             self.analysis_functions(nodes, [{"name": 'root', "type": None}], file, isroot=True)
             self.function_list += file.function_list
 
-        if analysis_mode == 'scan':
-            # function call analysis
-            logger.info("[INFO] Collecting function calls...")
-            for file in tqdm(self.file_list):
-                nodes = ast_object.get_nodes(file.file_path)
-
-                if not nodes:
-                    continue
-
-                self.analysis_call(nodes, [{"name": 'root', "type": None}], file)
-
-            # save caller to function
-            self.gen_call_graph()
+        # if analysis_mode == 'scan':
+        #     # function call analysis
+        #     logger.info("[INFO] Collecting function calls...")
+        #     for file in tqdm(self.file_list):
+        #         nodes = ast_object.get_nodes(file.file_path)
+        #
+        #         if not nodes:
+        #             continue
+        #
+        #         self.analysis_call(nodes, [{"name": 'root', "type": None}], file)
+        #
+        #     # save caller to function
+        #     self.gen_call_graph()
 
         # control flow of every function
         logger.info("[INFO] Generating control flows...")
         new_file_list = []
-        for func in tqdm(self.function_list):
+
+        if analysis_mode != 'synthesis':
+            iter = tqdm(self.function_list)
+        else:
+            iter = self.function_list
+        for func in iter:
+            if len(func.node_ast.nodes) == 0:
+                continue
             try:
                 base_flow = Flow("base", [], func.start_lineno)
                 isset = base_flow.set_base_flow(func.node_ast.nodes, func)
@@ -232,11 +283,12 @@ class FuncCall:
                     start_pos0 = base_flow.inner_start_position
                 if hasattr(base_flow, 'inner_end_position'):
                     end_pos0 = base_flow.inner_end_position
-                func.set_control_flow(control_flow_analysis(func.node_ast.nodes, base_flow, func, start_pos0=start_pos0, end_pos0=end_pos0))
+                func.set_control_flow(control_flow_analysis(func.node_ast.nodes, base_flow, func, start_pos0=start_pos0,
+                                                            end_pos0=end_pos0))
                 new_file_list.append(func.file)
             except Exception as e:
                 continue
-        self.files[0][1]['list']=new_file_list
+        self.files[0][1]['list'] = new_file_list
 
         new_file_list = []
         for file in self.file_list:
@@ -246,15 +298,12 @@ class FuncCall:
 
         return
 
-
-
     def gen_call_graph(self):
         for call_stmt in self.call_list:
             for oc in call_stmt.callers:
                 for func in self.function_list:
                     if func == oc.function:
                         func.set_callers(call_stmt)
-
 
     def analysis_call(self, nodes, father_list, file, stmt_node=None):
         """
@@ -307,7 +356,6 @@ class FuncCall:
                 new_father_list.append({"name": new_node_name, "type": new_node_type})
                 is_recursion = True
 
-
             new_father_list = father_list
 
             # next node
@@ -355,7 +403,8 @@ class FuncCall:
             (node, father_call) = tem
 
             # judge is function call
-            if isinstance(node, php.FunctionCall) or isinstance(node, php.MethodCall) or isinstance(node, php.StaticMethodCall):
+            if isinstance(node, php.FunctionCall) or isinstance(node, php.MethodCall) or isinstance(node,
+                                                                                                    php.StaticMethodCall):
                 class_name = None
                 if isinstance(node, php.StaticMethodCall):
                     class_name = str(node.class_)
@@ -398,9 +447,6 @@ class FuncCall:
 
             self.call_list.append(callstmt)
 
-
-
-
     def func_match(self, node, type, father_list, file, class_name=None, class_=None):
         """
         match functionCall with function in self.function_list
@@ -420,9 +466,11 @@ class FuncCall:
         # analysis which function can functioncall  access
         if len(same_name_func) == 1:
             return same_name_func[0]
-        elif len(same_name_func) > 1 and len(same_name_func) <=3:
-            logger.warning(
-                "[WARNING] function match multy result:\n\t\t\trealm: {}, \n\tfunction name:".format(father_list,same_name_func[0].func_name))
+        elif len(same_name_func) > 1 and len(same_name_func) <= 3:
+            logger.debug(
+                "[FUNC] function match multy result:\n\t\t\trealm: {}, \n\tfunction name:".format(father_list,
+                                                                                                     same_name_func[
+                                                                                                         0].func_name))
             result_func = None
             for func in same_name_func:
                 if result_func == None:
@@ -451,10 +499,10 @@ class FuncCall:
                     result_func = func
 
             if result_func == None:
-                logger.error("[ERROR] function match error: 1")
+                logger.debug("[FUNC] function match error: 1")
 
             return result_func
-        elif len(same_name_func) >3:
+        elif len(same_name_func) > 3:
             return None
         else:
             # include
@@ -476,7 +524,7 @@ class FuncCall:
             if len(same_name_func) == 1:
                 return same_name_func[0]
             elif len(same_name_func) > 1:
-                logger.error("[ERROR] function match error: 2")
+                logger.debug("[FUNC] function match error: 2")
 
             else:
                 # build in function
@@ -502,7 +550,7 @@ class FuncCall:
         """
         new_nodes = []
         new_code = "\n".join(file.code_content[:nodes[0].lineno - 1])
-        code_line = [{'lineno':i + 1, 'position':None} for i in range(nodes[0].lineno - 1)]
+        code_line = [{'lineno': i + 1, 'position': None} for i in range(nodes[0].lineno - 1)]
         end_lineno = nodes[0].lineno - 1
 
         for i, node in enumerate(nodes):
@@ -514,9 +562,7 @@ class FuncCall:
                 if next_node:
                     next_lineno = next_node.lineno
                 else:
-                    logger.error("[ERROR] func_call.init_function_list(): 1")
-
-
+                    logger.debug("[FUNC] func_call.init_function_list(): 1")
 
             start_pos = node.lineno - 1
             if not next_node:
@@ -526,13 +572,13 @@ class FuncCall:
                     new_code += "\n" + "\n".join(file.code_content[start_pos:])
             else:
                 end_pos = next_node.lineno - 1
-                if end_pos>start_pos:
+                if end_pos > start_pos:
                     if start_pos == 0:
                         new_code += "\n".join(file.code_content[start_pos:end_pos])
                     else:
                         new_code += "\n" + "\n".join(file.code_content[start_pos:end_pos])
             for l in range(node.lineno, next_lineno):
-                code_line.append({'lineno':l, 'position':None})
+                code_line.append({'lineno': l, 'position': None})
             end_lineno = len(file.code_content)
             new_nodes.append(node)
 
@@ -566,7 +612,10 @@ class FuncCall:
                     if i + 1 < len(nodes):
                         next_node = nodes[i + 1]
 
-                    node_code, start_line, end_lineno, code_line = self.get_func_code(node, next_node, file)
+                    try:
+                        node_code, start_line, end_lineno, code_line = self.get_func_code(node, next_node, file)
+                    except:
+                        continue
 
                     # prepare function/method information
                     function_info = FunctionInfo(new_node_name, new_node_type, father_list, node, node_code,
@@ -609,7 +658,7 @@ class FuncCall:
             last_lineno = next_node.lineno - 1
 
             func_code = '\n'.join(file.code_content[start_lineno:last_lineno])
-            code_line = [{'lineno':start_lineno + 1 + i, 'position':None} for i in range(last_lineno - start_lineno)]
+            code_line = [{'lineno': start_lineno + 1 + i, 'position': None} for i in range(last_lineno - start_lineno)]
             return func_code, start_lineno + 1, last_lineno + 1, code_line
         else:
             func_code = '\n'.join(file.code_content[start_lineno:])
@@ -619,8 +668,8 @@ class FuncCall:
         last_pos = match_str(func_code, '{') + 1
         lr_pos = match_pair(tem_code, '{', '}')
         if not lr_pos:
-            logger.error("[ERROR] get_func_code(): iter error, code: {}".format(tem_code))
-
+            logger.debug("[FUNC] get_func_code(): iter error, code: {}".format(tem_code))
+            raise Exception
 
         last_pos += lr_pos[1]
 
@@ -629,8 +678,6 @@ class FuncCall:
         code_line = []
         for i in range(len(func_code.split('\n'))):
             last_lineno += 1
-            code_line.append({'lineno':last_lineno, 'position':None})
+            code_line.append({'lineno': last_lineno, 'position': None})
 
         return func_code, start_lineno + 1, last_lineno, code_line
-
-

@@ -81,6 +81,13 @@ class Flow:
             if_flow.set_flow_position(all_code_position, self_code_position)
 
             if_flow = control_flow_analysis(node.node.nodes, if_flow, func, if_flow.inner_start_position, if_flow.inner_end_position)
+        elif node.node.__class__.__name__ in ['Foreach', 'For', 'While', 'If']:
+            self_code_position = if_flow.get_self_code_position(func, all_code_position, match_zone=True)
+            if_flow.set_flow_position(all_code_position, self_code_position)
+
+            if_flow = control_flow_analysis([node.node], if_flow, func, if_flow.inner_start_position,
+                                            if_flow.inner_end_position)
+
         else:
             self_code_position = if_flow.get_self_code_position(func, all_code_position, match_line=True)
             if_flow.set_flow_position(all_code_position, self_code_position)
@@ -112,6 +119,14 @@ class Flow:
 
                     else_flow = control_flow_analysis(node.else_.node.nodes, else_flow, func, else_flow.inner_start_position, else_flow.inner_end_position)
                     if_flow.subnode.append(else_flow)
+            elif node.else_.node.__class__.__name__ in ['Foreach', 'For', 'While', 'If']:
+                self_code_position = else_flow.get_self_code_position(func, all_code_position, match1=False,
+                                                                      match_zone=True)
+                else_flow.set_flow_position(all_code_position, self_code_position)
+
+                else_flow = control_flow_analysis([node.else_.node], else_flow, func, else_flow.inner_start_position,
+                                                  else_flow.inner_end_position)
+                if_flow.subnode.append(else_flow)
             else:
                 self_code_position = else_flow.get_self_code_position(func, all_code_position, match1=False, match_line=True)
                 else_flow.set_flow_position(all_code_position, self_code_position)
@@ -133,6 +148,12 @@ class Flow:
 
             while_flow = control_flow_analysis(node.node.nodes, while_flow, func, while_flow.inner_start_position,
                                                while_flow.inner_end_position)
+        elif node.node.__class__.__name__ in ['Foreach', 'For', 'While', 'If']:
+            self_code_position = while_flow.get_self_code_position(func, all_code_position, match_zone=True)
+            while_flow.set_flow_position(all_code_position, self_code_position)
+
+            while_flow = control_flow_analysis([node.node], while_flow, func, while_flow.inner_start_position,
+                                               while_flow.inner_end_position)
 
         else:
             self_code_position = while_flow.get_self_code_position(func, all_code_position, match_line=True)
@@ -152,6 +173,12 @@ class Flow:
 
             foreach_flow = control_flow_analysis(node.node.nodes, foreach_flow, func, foreach_flow.inner_start_position,
                                                foreach_flow.inner_end_position)
+        elif  node.node.__class__.__name__ in ['Foreach', 'For', 'While', 'If']:
+            self_code_position = foreach_flow.get_self_code_position(func, all_code_position, match_zone=True)
+            foreach_flow.set_flow_position(all_code_position, self_code_position)
+
+            foreach_flow = control_flow_analysis([node.node], foreach_flow, func, foreach_flow.inner_start_position,
+                                                 foreach_flow.inner_end_position)
 
         else:
             self_code_position = foreach_flow.get_self_code_position(func, all_code_position, match_line=True)
@@ -174,6 +201,12 @@ class Flow:
 
             for_flow = control_flow_analysis(node.node.nodes, for_flow, func, for_flow.inner_start_position,
                                                for_flow.inner_end_position)
+        elif node.node.__class__.__name__ in ['Foreach', 'For', 'While', 'If']:
+            self_code_position = for_flow.get_self_code_position(func, all_code_position, match_zone=True)
+            for_flow.set_flow_position(all_code_position, self_code_position)
+
+            for_flow = control_flow_analysis([node.node], for_flow, func, for_flow.inner_start_position,
+                                             for_flow.inner_end_position)
 
         else:
             self_code_position = for_flow.get_self_code_position(func, all_code_position, match_line=True)
@@ -193,7 +226,7 @@ class Flow:
         sub_flow.set_flow_position(self_code_position, self_code_position)
 
 
-    def get_self_code_position(self, func, all_code_position, match1=True, match_word="", match_line=False):
+    def get_self_code_position(self, func, all_code_position, match1=True, match_word="", match_line=False, match_zone=False):
         self_code_position = []
         all_code = ""
         for code_line in all_code_position:
@@ -215,7 +248,7 @@ class Flow:
         if match1:
             lr_pos = match_pair(all_code, '(', ')')
             if not lr_pos:
-                logger.error("[ERROR] Flow.set_base_flow(): 1")
+                logger.debug("[FLOW] Flow.set_base_flow(): 1")
                 raise Exception
 
             l_pos, r_pos = lr_pos[0], lr_pos[1]
@@ -228,11 +261,34 @@ class Flow:
             self.set_inner_sp(l_pos+1)
             self.set_inner_ep(r_pos+1)
 
+        # match if() if(){}
+        elif match_zone:
+            lr_pos = match_pair(all_code[r_pos:], '{', '}')
+
+            # match if() if() ...;
+            if not lr_pos:
+                end_p = match_str(all_code[r_pos:], ';')
+                if not end_p:
+                    logger.debug("[FLOW] Flow.set_base_flow(): 3")
+                    raise Exception
+
+                l_pos = r_pos + realm_sp
+                r_pos = end_p + l_pos
+                self.set_inner_sp(l_pos + 1)
+                self.set_inner_ep(r_pos + 1)
+
+            # match if() if(){}
+            else:
+                l_pos, r_pos = r_pos, lr_pos[1] + r_pos
+                l_pos, r_pos = l_pos + realm_sp, r_pos + realm_sp
+                self.set_inner_sp(l_pos + 1)
+                self.set_inner_ep(r_pos + 1)
+
         # match '... else {...}'
         else:
             lr_pos = match_pair(all_code[r_pos:], '{', '}')
             if not lr_pos:
-                logger.error("[ERROR] Flow.set_base_flow(): 2")
+                logger.debug("[FLOW] Flow.set_base_flow(): 2")
                 raise Exception
             l_pos, r_pos = lr_pos[0] + r_pos, lr_pos[1] + r_pos
             l_pos, r_pos = l_pos + realm_sp, r_pos + realm_sp
@@ -321,7 +377,7 @@ def control_flow_analysis(nodes, base_flow, func, start_pos0=None, end_pos0=None
             next_node_lineno = nodes[i+1].lineno
             next_code_line = func.get_code_by_lineno(next_node_lineno)
             if not code_line:
-                logger.error("[ERROR] flow.control_flow_analysis(): 1")
+                logger.debug("[FLOW] flow.control_flow_analysis(): 1")
             end_pos = next_code_line['position'][0]
 
         if start_pos0 and start_pos0>start_pos:

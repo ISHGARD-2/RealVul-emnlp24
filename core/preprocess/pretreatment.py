@@ -35,8 +35,7 @@ class Pretreatment:
 
         # self.pre_ast_all()
 
-    def init_pre(self, target_directory, files, file_list):
-        self.file_list = files
+    def init_pre(self, target_directory, file_list):
         self.target_directory = target_directory
 
         self.target_directory = os.path.normpath(self.target_directory)
@@ -169,7 +168,7 @@ class Pretreatment:
     def pop_none_node(self, nodes):
 
         for i, node in enumerate(nodes):
-            if node is None:
+            if node is None or node.__class__.__name__ == 'str':
                 del nodes[i]
                 continue
 
