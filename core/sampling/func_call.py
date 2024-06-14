@@ -8,11 +8,11 @@ from tqdm import tqdm
 
 from utils.log import logger
 from phply import phpast as php
-from core.preprocess.pretreatment import ast_object
+from core.sampling.pretreatment import ast_object
 from utils.file import FileParseAll, check_comment
 from configs.const import BUILTIN_FUNC
-from core.preprocess.flow import Flow, control_flow_analysis
-from utils.utils import match_str, match_pair, support_check
+from core.sampling.flow import Flow, control_flow_analysis
+from utils.my_utils import match_str, match_pair, support_check
 
 
 class PhpRootNode:
@@ -259,6 +259,9 @@ class FuncCall:
         #
         #     # save caller to function
         #     self.gen_call_graph()
+
+        if analysis_mode == 'sampling_by_fix':
+            return
 
         # control flow of every function
         logger.info("[INFO] Generating control flows...")
@@ -554,6 +557,9 @@ class FuncCall:
         end_lineno = nodes[0].lineno - 1
 
         for i, node in enumerate(nodes):
+            if isinstance(node, php.Class) or isinstance(node, php.Method) or isinstance(node, php.Function):
+                continue
+
             next_node = None
             if i + 1 >= len(nodes):
                 next_lineno = len(file.code_content) + 1
@@ -583,10 +589,11 @@ class FuncCall:
             new_nodes.append(node)
 
         # prepare root function/method information
-        root_function_info = FunctionInfo("root", None, [], PhpRootNode(new_nodes), new_code, file.file_path)
-        root_function_info.set_lineno(1, end_lineno, code_line)
-        root_function_info.set_code_line_position(file)
-        file.function_list.append(root_function_info)
+        if len(new_nodes) > 0:
+            root_function_info = FunctionInfo("root", None, [], PhpRootNode(new_nodes), new_code, file.file_path)
+            root_function_info.set_lineno(1, end_lineno, code_line)
+            root_function_info.set_code_line_position(file)
+            file.function_list.append(root_function_info)
 
     def analysis_functions(self, nodes, father_list, file, isroot=False):
         """

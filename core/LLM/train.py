@@ -1,6 +1,8 @@
 import sys
 
 import logging
+
+from accelerate import Accelerator
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import (
@@ -25,34 +27,6 @@ class MyTrainer(SFTTrainer):
         Subclass and override for custom behavior.
         """
 
-        # data_path = DATA_PATH + '/SARD/SARD_php_vulnerability_79.json'
-        # base_model_path = LLM_ENV_PATH + 'models/7b/'
-        # output_model_path = MODEL_PATH + '/output/codellama-7b/test1/'
-        # check_point_path = output_model_path + "checkpoint-400"
-        # new_model_path = output_model_path + "tuned_model"
-        #
-        # # data
-        # train_dataset, test_dataset, tokenizer = get_data(data_path, base_model_path)
-        #
-        # result_list = []
-        # # TN FP FN TP
-        # evalmatrix = [0, 0, 0, 0, 0]
-        # sum = len(test_dataset.labels.tolist())
-        # tr_data = DataLoader(train_dataset, batch_size=1, shuffle=False)
-        # device = torch.device('cuda')
-        # for step, batch in enumerate(tr_data):
-        #     if step >= 100:
-        #         break
-        #     batch = tuple(batch[t].to(device) for t in batch)
-        #     b_input_ids, b_input_mask, b_labels = batch
-        #
-        #     test_output = model(b_input_ids,
-        #                              attention_mask=b_input_mask)
-        #
-        #     eval_predictions = torch.argmax(test_output.logits, dim=1).tolist()[0]
-        #
-        #     label = b_labels.tolist()[0]
-        #     print(eval_predictions,' ： ', label)
 
         outputs = model(**inputs)
         labels = inputs['labels']
@@ -69,7 +43,7 @@ class MyTrainer(SFTTrainer):
         return (loss, outputs) if return_outputs else loss
 
 
-def train_model(base_model_path, load_class, train_const, train_dataset, eval_dataset, tokenizer, output_model_path, new_model_path,
+def train_model(base_model_path, load_class, train_const, train_task, train_dataset, eval_dataset, tokenizer, output_model_path, new_model_path,
                 check_point_path=''):
     """
 
@@ -89,7 +63,7 @@ def train_model(base_model_path, load_class, train_const, train_dataset, eval_da
         lora_dropout=train_const.lora_dropout,
         r=train_const.lora_r,
         bias="none",
-        task_type=TaskType.SEQ_CLS,
+        task_type=train_const.train_task[train_task],
         target_modules=train_const.target_modules
     )
 
@@ -110,13 +84,15 @@ def train_model(base_model_path, load_class, train_const, train_dataset, eval_da
         warmup_steps=train_const.warmup_steps,
         group_by_length=train_const.group_by_length,
         report_to="none",
-        eval_steps=train_const.eval_steps
+        eval_steps=train_const.eval_steps,
+        evaluation_strategy="steps"
     )
-    logger.info("\n[LLM] Tarining CodeLlama...")
     logger.info(new_model_path)
 
-    model.config.pad_token_id = model.config.eos_token_id
+    if train_const.set_eos:
+        model.config.pad_token_id = model.config.eos_token_id
     model.config.use_cache = False
+
     trainer = MyTrainer(
         model=model,
         args=training_arguments,
@@ -132,7 +108,7 @@ def train_model(base_model_path, load_class, train_const, train_dataset, eval_da
 
     if torch.__version__ >= "2" and sys.platform != "win32":
         logger.info("compiling the model")
-        model = torch.compile(model)
+        torch.compile(model)
 
     # Train model
     logger.info("[LLM] Go training")
@@ -143,4 +119,6 @@ def train_model(base_model_path, load_class, train_const, train_dataset, eval_da
         trainer.train()
 
     trainer.save_model(new_model_path)
+    if 'T5ForSequenceClassification' == load_class.__name__:
+        torch.save(model.state_dict(), new_model_path+'.pt')
     logger.info("[LLM] Training is over")

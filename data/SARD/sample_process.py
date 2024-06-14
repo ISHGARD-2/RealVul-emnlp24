@@ -4,7 +4,7 @@ import os
 from configs.const import INPUT_VARIABLES
 from configs.settings import DATA_PATH
 from utils.func_json import read_json, write_json
-from utils.utils import match_pair, replace_str
+from utils.my_utils import match_pair, replace_str
 from rules.php.CVI_10001 import CVI_10001
 
 FILE_PATH = os.path.join(DATA_PATH, 'SARD', 'SARD_php_vulnerability_89.json')

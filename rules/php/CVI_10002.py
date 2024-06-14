@@ -1,6 +1,6 @@
 import re
 
-from utils.utils import match_params, match_pair
+from utils.my_utils import match_params, match_pair
 
 
 class CVI_10002():

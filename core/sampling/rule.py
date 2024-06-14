@@ -7,32 +7,6 @@ from utils.log import logger
 
 
 
-def block(index):
-    default_index_reverse = 'in-function'
-    default_index = 0
-    blocks = {
-        'in-function-up': 0,
-        'in-function-down': 1,
-        'in-current-line': 2,
-        'in-function': 3,
-        'in-class': 4,
-        'in-class-up': 5,
-        'in-class-down': 6,
-        'in-file': 7,
-        'in-file-up': 8,
-        'in-file-down': 9
-    }
-    if isinstance(index, int):
-        blocks_reverse = dict((v, k) for k, v in blocks.items())
-        if index in blocks_reverse:
-            return blocks_reverse[index]
-        else:
-            return default_index_reverse
-    else:
-        if index in blocks:
-            return blocks[index]
-        else:
-            return default_index
 
 
 class Rule(object):

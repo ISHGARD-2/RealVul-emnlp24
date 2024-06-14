@@ -2,7 +2,7 @@
 import re
 
 from configs.const import REGEX
-from utils.utils import match_pair, match_params
+from utils.my_utils import match_pair, match_params
 
 
 class CVI_10001():

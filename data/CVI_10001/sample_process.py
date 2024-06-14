@@ -10,7 +10,7 @@ from configs.const import INPUT_VARIABLES, SYNTHESIS_LEN
 from configs.settings import DATA_PATH
 from rules.php.CVI_10001 import CVI_10001
 from utils.log import logger
-from utils.utils import match_pair, replace_str
+from utils.my_utils import match_pair, replace_str
 from phply.phplex import lexer
 from phply.phpparse import make_parser
 

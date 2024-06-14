@@ -1,7 +1,14 @@
+from peft import TaskType
 
 
 class TrainConst:
     def __init__(self):
+        #train_task
+        self.train_task = {'seq_cls':TaskType.SEQ_CLS, 'causal LM':TaskType.CAUSAL_LM}
+
+        #data loader num_workers
+        self.num_workers=4
+
         # peft target module
         self.target_modules=["q_proj", "v_proj"]
 
@@ -34,10 +41,10 @@ class TrainConst:
         self.group_by_length = True
 
         # Log every X updates steps
-        self.logging_steps = 5
+        self.logging_steps = 20
 
         # evaluate model after n steps
-        self.eval_steps = 50
+        self.eval_steps = 200
 
         ################################################################################
         # SFT parameters
@@ -63,7 +70,7 @@ class Codellama_7b_TrainConst(TrainConst):
 
         self.per_device_train_batch_size = 8
         # Batch size per GPU for evaluation
-        self.per_device_eval_batch_size = 16
+        self.per_device_eval_batch_size = 12
 
         # Number of update steps to accumulate the gradients for
         self.gradient_accumulation_steps = 8
@@ -75,7 +82,7 @@ class Codellama_7b_TrainConst(TrainConst):
         self.max_steps = 400
 
         # steps for a linear warmup (from 0 to learning rate)
-        self.warmup_steps = 50
+        self.warmup_steps = 100
 
         # Initial learning rate (AdamW optimizer)
         self.learning_rate = 2e-4
@@ -93,9 +100,9 @@ class Codet5p_770m_TrainConst(TrainConst):
     def __init__(self):
         # Batch size per GPU for training
         super().__init__()
-        self.per_device_train_batch_size = 16
+        self.per_device_train_batch_size = 8
         # Batch size per GPU for evaluation
-        self.per_device_eval_batch_size = 48
+        self.per_device_eval_batch_size = 16
 
         #target_modules
         self.target_modules = ['q', 'v']
@@ -104,7 +111,43 @@ class Codet5p_770m_TrainConst(TrainConst):
         self.gradient_accumulation_steps = 8
 
         # Save checkpoint every X updates steps
-        self.save_steps = 25
+        self.save_steps = 50
+
+        # Number of training steps (overrides num_train_epochs)
+        self.max_steps = 300
+
+        # steps for a linear warmup (from 0 to learning rate)
+        self.warmup_steps = 50
+
+        # Initial learning rate (AdamW optimizer)
+        self.learning_rate = 1e-3
+
+        # Number of training epochs
+        self.num_train_epochs = 3
+
+        # set padding token as eos
+        self.set_eos = False
+
+
+############################################
+# for code t5 base
+############################################
+class Codet5_base_TrainConst(TrainConst):
+    def __init__(self):
+        # Batch size per GPU for training
+        super().__init__()
+        self.per_device_train_batch_size = 8
+        # Batch size per GPU for evaluation
+        self.per_device_eval_batch_size = 16
+
+        #target_modules
+        self.target_modules = ['q', 'v']
+
+        # Number of update steps to accumulate the gradients for
+        self.gradient_accumulation_steps = 8
+
+        # Save checkpoint every X updates steps
+        self.save_steps = 50
 
         # Number of training steps (overrides num_train_epochs)
         self.max_steps = 300
@@ -143,7 +186,7 @@ class Starcoder2_7b_TrainConst(TrainConst):
         self.max_steps = 300
 
         # steps for a linear warmup (from 0 to learning rate)
-        self.warmup_steps = 25
+        self.warmup_steps = 50
 
         # Initial learning rate (AdamW optimizer)
         self.learning_rate = 8e-4
@@ -186,34 +229,3 @@ class Starcoder2_3b_TrainConst(TrainConst):
         # set padding token as eos
         self.set_eos = True
 
-############################################
-# for code t5+ 2b
-############################################
-class Codet5p_2b_TrainConst(TrainConst):
-    def __init__(self):
-        # Batch size per GPU for training
-        super().__init__()
-        self.per_device_train_batch_size = 16
-        # Batch size per GPU for evaluation
-        self.per_device_eval_batch_size = 32
-
-        # Number of update steps to accumulate the gradients for
-        self.gradient_accumulation_steps = 8
-
-        # Save checkpoint every X updates steps
-        self.save_steps = 50
-
-        # Number of training steps (overrides num_train_epochs)
-        self.max_steps = 300
-
-        # steps for a linear warmup (from 0 to learning rate)
-        self.warmup_steps = 25
-
-        # Initial learning rate (AdamW optimizer)
-        self.learning_rate = 4e-3
-
-        # Number of training epochs
-        self.num_train_epochs = 3
-
-        # set padding token as eos
-        self.set_eos = False

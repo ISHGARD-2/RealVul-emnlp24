@@ -4,7 +4,8 @@ import time
 import traceback
 from utils.log import logger
 from configs.const import ext_dict
-from utils.utils import match_pair, match_str
+
+from utils.my_utils import match_pair, match_str
 
 ext_list = []
 for e in ext_dict:
@@ -188,9 +189,10 @@ def check_end_line_elseif(content):
     return backstr
 
 
-def clear_slice(slice):
-    for char in ['{', '}']:
-        slice = slice.replace(char, char + '\n')
+def clear_slice(slice, append_endline=True):
+    if append_endline:
+        for char in ['{', '}']:
+            slice = slice.replace(char, '\n' + char + '\n')
 
     slice_split = slice.split('\n')
     new_slice = ""

@@ -3,7 +3,8 @@ import os
 import re
 
 from configs.const import NOT_SUPPORT_STRING, SLICE_FILTER, INPUT_VARIABLES, REG, STRING_REPLACE_ELEMENT, REGEX
-from configs.settings import RULES_PATH
+from configs.settings import RULES_PATH, DATA_PATH
+from utils.func_json import read_json
 
 from utils.log import logger
 
@@ -190,6 +191,41 @@ def match_vars(regex_string, with_position=False):
         return match_out
     return None
 
+
+def analy_metadata(CWE):
+    out = []
+    CWE = CWE
+    for l, cwe in enumerate(CWE):
+        CWE[l] = 'CWE-'+CWE[l]
+
+    metadata_path = os.path.join(DATA_PATH, 'crossvul', 'metadata.json')
+    json_data = read_json(metadata_path)
+    for i, cve in enumerate(json_data):
+        proj = {}
+
+        if cve['cwe'] not in CWE :
+            continue
+
+        cve_id = i
+
+        project = '_'.join(cve['url'].split('/')[3:5])
+
+        exsit = False
+        for i, pro in enumerate(out):
+            if pro['name'] == project:
+                exsit = True
+                proj = out[i]
+                break
+
+        if exsit:
+            if cve not in proj['cve']:
+                proj['cve'].append(cve_id)
+        else:
+            proj['name'] = project
+            proj['cve'] = [cve_id]
+            out.append(proj)
+
+    return out
 
 def match_pair(str, left_str, right_str, instr=False):
     """

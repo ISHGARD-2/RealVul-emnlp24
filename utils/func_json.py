@@ -2,6 +2,9 @@ import json
 import csv
 
 def read_json(path):
+    if path is None or path == '':
+        return []
+
     f = open(path, 'r')
     content = f.read()
     data = json.loads(content)

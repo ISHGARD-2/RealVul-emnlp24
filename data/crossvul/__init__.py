@@ -1,5 +1,6 @@
 import os
 
+from configs.settings import DATA_PATH
 from utils.func_json import read_json
 
 
@@ -40,27 +41,10 @@ def remove_file():
             else:
                 fopen.close()
 
-def analy_meta_data(json_data):
-    out = {}
-    for i, cve in enumerate(json_data):
-        if cve['cwe'] != 'CWE-79':
-            continue
-        cve['id'] = i
-
-        project = '_'.join(cve['url'].split('/')[3:5])
-        if project in out.keys():
-            out[project].append(cve)
-        else:
-            out[project] = [cve]
-
-    for key in out.keys():
-        if len(out[key])>1:
-            continue
-    return
 
 if __name__ == "__main__":
     # rename_file()
     # remove_file()
 
     json_data = read_json(r"D:\USTC_CD\PROGRAM\LLMforSAST\code\LLMforSAST\data\crossvul\metadata.json")
-    analy_meta_data(json_data)
+

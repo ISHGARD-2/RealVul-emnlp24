@@ -1,11 +1,11 @@
 from configs.settings import MAX_SLICE_LENGTH
-from core.preprocess.pretreatment import get_var_by_ast
+from core.sampling.pretreatment import get_var_by_ast
 from utils.file import clear_slice
 from utils.log import logger
 import queue
 from phply import phpast as php
 from configs.const import INPUT_VARIABLES
-from utils.utils import slice_filter, slice_input_check, match_params, slilce_check_syntax
+from utils.my_utils import slice_filter, slice_input_check, match_params, slilce_check_syntax
 
 
 def get_slice_from_flow(flow, code_slice_flag, isroot=False):

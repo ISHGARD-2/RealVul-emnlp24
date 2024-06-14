@@ -8,7 +8,7 @@ from phply.phplex import lexer
 from phply.phpparse import make_parser
 
 from utils.func_json import write_json
-from utils.utils import match_params
+from utils.my_utils import match_params
 from .rule import Rule
 from configs.settings import DATA_PATH, MAX_SLICE_LENGTH
 from utils.file import FileParseAll

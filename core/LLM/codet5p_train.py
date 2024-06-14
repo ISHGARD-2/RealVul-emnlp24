@@ -78,6 +78,7 @@ def train_model(train_dataset, eval_dataset, tokenizer, base_model_path, output_
 
     model.config.pad_token_id = model.config.eos_token_id
     model.config.use_cache = False
+
     trainer = MyTrainer(
         model=model,
         args=training_arguments,

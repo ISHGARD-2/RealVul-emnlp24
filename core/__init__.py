@@ -9,10 +9,10 @@ import argparse
 from configs.settings import RESULT_PATH
 from utils.file import Directory
 from utils.log import log, logger
-from utils.utils import ParseArgs
+from utils.my_utils import ParseArgs
 
-from core.preprocess.func_call import FuncCall
-from core.preprocess.engine import scan
+from core.sampling.func_call import FuncCall
+from core.sampling.engine import scan
 
 
 def args_prepare(args):

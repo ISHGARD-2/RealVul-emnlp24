@@ -1,13 +1,18 @@
+import os
+import sys
+
 import torch
-from peft import PeftModel
+from peft import PeftModel, LoraConfig, get_peft_model
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+import torch.nn as nn
 
+from configs.settings import RESULT_PATH
+from utils.func_json import write_json
 from utils.log import logger
 
 
-def eval_model(base_model_path, load_class, train_const, eval_dataset, tokenizer, new_model_path):
-    logger.info("Start eval")
+def eval_model(base_model_path, load_class, train_const, eval_dataset, new_model_path, predict=False):
     logger.info("checkpoint path: {}".format(new_model_path))
     logger.info("Load model")
 
@@ -18,18 +23,27 @@ def eval_model(base_model_path, load_class, train_const, eval_dataset, tokenizer
         output_scores=True
     )
 
-    raw_data = eval_dataset.raw_data
+    result_save_path = os.path.join(RESULT_PATH, train_const.__class__.__name__[:-11] + '.json')
 
+    raw_data = eval_dataset.raw_data
     lora_model = PeftModel.from_pretrained(model, new_model_path)
     lora_model = lora_model.merge_and_unload()
 
+    if 'T5ForSequenceClassification' == load_class.__name__:
+        state_dict = torch.load(new_model_path + '.pt')
+        state_dict = dict(list(state_dict.items())[-4:])
+        # lora_model.load_state_dict(dict(list(state_dict.items())[-4:]))
+        lora_model.classification_head.dense.bias = nn.Parameter(state_dict['classification_head.dense.bias'])
+        lora_model.classification_head.dense.weight = nn.Parameter(state_dict['classification_head.dense.weight'])
+        lora_model.classification_head.out_proj.bias = nn.Parameter(state_dict['classification_head.out_proj.bias'])
+        lora_model.classification_head.out_proj.weight = nn.Parameter(state_dict['classification_head.out_proj.weight'])
+
+    # print(lora_model)
+
     lora_model.eval()
     # lora_model.half()
-
-    model.config.pad_token_id = model.config.eos_token_id
-    # if torch.__version__ >= "2" and sys.platform != "win32":
-    #     logger.info("compiling the model")
-    #     lora_model = torch.compile(lora_model)
+    if train_const.set_eos:
+        model.config.pad_token_id = model.config.eos_token_id
 
     result_list = []
     # TN FP FN TP
@@ -54,10 +68,18 @@ def eval_model(base_model_path, load_class, train_const, eval_dataset, tokenizer
 
 
             for label, pred in zip(label, eval_predictions):
-                result = {'file_name': raw_data['file_name'][count], 'label': label, 'pred':pred}
-                text = raw_data['text'][count]
+                sample = raw_data[count]
+
+                if sample['label'] == 'good':
+                    sample_label = 0
+                else:
+                    sample_label = 1
+                if label != sample_label:
+                    raise Exception
+
+                sample['predict'] = pred
                 count += 1
-                result_list.append(result)
+                result_list.append(sample)
 
                 if label == 0 and pred == 0:
                     evalmatrix[0] += 1
@@ -73,7 +95,7 @@ def eval_model(base_model_path, load_class, train_const, eval_dataset, tokenizer
                 else:
                     evalmatrix[4] += 1
 
-    logger.info('\nevalmatrix: {matrix}\n\tTP: {tp}\tFN: {fn}\n\tFP: {fp}\tTN: {tn}\n\t:'.format(
+    logger.info('\nevalmatrix: {matrix}\n\tTP: {tp}\tFN: {fn}\n\tFP: {fp}\tTN: {tn}\n'.format(
         matrix=str(evalmatrix),
         tn=str(evalmatrix[0] / sum), fp=str(evalmatrix[1] / sum),
         fn=str(evalmatrix[2] / sum), tp=str(evalmatrix[3] / sum)))
@@ -87,9 +109,15 @@ def eval_model(base_model_path, load_class, train_const, eval_dataset, tokenizer
         recall_score = (evalmatrix[3]) / (evalmatrix[3] + evalmatrix[2])
         F1_score = (2 * precision_score * recall_score) / (precision_score + recall_score)
 
-    logger.info('\nAccuracy: {Accuracy}\nRecall: {Recall}\nPrecision: {Precision}\nF1: {F1}\n\t:'.format(
+    logger.info('\nAccuracy: {Accuracy}\nRecall: {Recall}\nPrecision: {Precision}\nF1: {F1}\n'.format(
         Accuracy=str(accuracy_score),
         Recall=str(recall_score),
         Precision=str(precision_score),
         F1=str(F1_score)))
-    logger.info("over")
+
+
+    logger.info("Eval Save path: {}".format(str(result_save_path)))
+    write_json(result_list, result_save_path)
+
+    logger.info("over\n\n\n")
+
