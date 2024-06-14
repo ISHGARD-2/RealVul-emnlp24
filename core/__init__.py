@@ -18,16 +18,6 @@ from core.sampling.engine import scan
 
 
 def parser_format():
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('-t', '--target', dest='target', type=str, default='', help="target file")
-    # parser.add_argument('-r', '--rule', dest='rule', type=str, default=None, help="vulnerability rule")
-    # parser.add_argument('-m', '--mode', dest='mode', type=str, default="test", help="vulnerability rule")
-    # args = parser.parse_args()
-    #
-    # if not hasattr(args, "target") or args.target == '':
-    #     parser.print_help()
-    #     exit()
-    # logger.debug('[INIT] start Scan Task...')
 
     parser = argparse.ArgumentParser()
     ## parameters
