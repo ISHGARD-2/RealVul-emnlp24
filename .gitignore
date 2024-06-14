@@ -1,10 +1,6 @@
 # ignore dir
 result/*
-data/c*
-data/C*
-data/s*
-data/S*
-data/D*
-data/f*
-data/t*
-data/D*
+data/*
+
+!data/README.md
+!data/__init__.py
