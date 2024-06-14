@@ -4,10 +4,9 @@ import logging
 import colorlog
 from configs.settings import LOGS_PATH, DEFAULT_LOG_PATH
 
-logger = logging.getLogger('ISHGARD')
-logger_console = logging.getLogger('ISHGARDConsoleLog')
+logger = logging.getLogger('RealVul')
+logger_console = logging.getLogger('RealVulConsoleLog')
 log_path = LOGS_PATH
-
 
 def log(loglevel, logfile=""):
     if os.path.isdir(log_path) is not True:

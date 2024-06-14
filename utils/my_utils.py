@@ -462,7 +462,7 @@ def replace_str(code, match_html=False):
 
 
 if __name__=='__main__':
-    os.chdir("D:\\USTC_CD\\学习\\我的论文\\LLMforSAST\\code\\LLMforSAST\\")
+    os.chdir("D:\\USTC_CD\\学习\\我的论文\\LLMforSAST\\code\\RealVul\\")
     str = """    public function delete($id)
     {
         $oGroupToDelete = $this->loadModel($id);

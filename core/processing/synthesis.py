@@ -14,7 +14,7 @@ from configs.const import SYNTHESIS_LEN, INPUT_VARIABLES
 from configs.settings import DATA_PATH, TMP_PATH, RESULT_PATH
 from core import args_prepare, FuncCall, scan
 from core.sampling.slicing import get_slice_from_flow
-from data.sample_process import rename_all_var_and_str_89, rename_all_var_and_str_79
+from core.processing.sample_preprocess import rename_all_var_and_str_89, rename_all_var_and_str_79
 from utils.file import Directory, clear_slice
 from utils.func_json import read_json, write_json
 from utils.log import log, logger
@@ -79,7 +79,7 @@ def remove_similar_slice(json_data, unique_samples=None, threshold=1.0, key='sli
     return unique_samples
 
 
-def func_prepare(sample_directory, clear_target_directory, CWE):
+def func_prepare(SARD_data_path, crossvul_data_path, clear_target_directory, CWE):
     crossvul_sample_data = read_json(crossvul_data_path)
     SARD_sample_data = read_json(SARD_data_path)
     SARD_sample_data = remove_similar_slice(SARD_sample_data, key='renamed_slice',
@@ -99,6 +99,8 @@ def func_prepare(sample_directory, clear_target_directory, CWE):
     # raw function list and control flow
     clear_target_func = FuncCall(clear_target_directory, files)
     clear_target_func.main('test')
+
+    sample_directory = os.path.join(TMP_PATH, 'source_code')
 
     direct_input = []
     direct_input += process_direct_input(crossvul_sample_data, CWE, source='crossvul')
@@ -235,9 +237,8 @@ def synthesis_threading(function_list, special_rules, sample, sample_code, sampl
         direct_input += unique_samples
 
 
-def synthesis(sample_directory, clear_target_directory, CWE, insert_count=8):
+def synthesis(SARD_data_path, crossvul_data_path, clear_target_directory, CWE, insert_count=8):
     """
-    sample_directory: raw vulnerable snippets' dir
     clear_target_directory: clear project to be inserted
     insert_count: randomly insert K times
     line_count: insert the first Cth line of code
@@ -271,7 +272,7 @@ def synthesis(sample_directory, clear_target_directory, CWE, insert_count=8):
     if not os.path.exists(synthesis_tmp_path):
         os.makedirs(synthesis_tmp_path)
 
-    sample_func_call, clear_target_func = func_prepare(sample_directory, clear_target_directory, CWE)
+    sample_func_call, clear_target_func = func_prepare(SARD_data_path, crossvul_data_path, clear_target_directory, CWE)
 
     systhesis_sample_lists = []
 
@@ -410,10 +411,9 @@ if __name__ == '__main__':
     CWE = '79'
 
     # sample data
-    sample_directory = TMP_PATH + '\\source_code\\'
     SARD_data_path = DATA_PATH + '\\SARD_php_vulnerability_' + CWE + '.json'
     crossvul_data_path = DATA_PATH + '\\dataset_unique_' + CWE + '.json'
 
     clear_target_directory = DATA_PATH + "\\crossvul\\all"
 
-    synthesis(sample_directory, clear_target_directory, CWE=CWE, insert_count=4)
+    synthesis(SARD_data_path, crossvul_data_path, clear_target_directory, CWE=CWE, insert_count=4)

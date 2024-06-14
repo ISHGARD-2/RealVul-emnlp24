@@ -308,46 +308,32 @@ def remove_similar_slice(json_data, threshold=1):
     return output_data
 
 
-# def gen_test_set(in_path, out_path):
-#     fp = open(in_path, 'r')
-#     json_data = json.load(fp)
-#     fp.close()
-#
-#     data_list = []
-#     for sample in json_data:
-#         if len(sample['renamed_slice'] ) > SYNTHESIS_LEN or sample['CVE_database_id']>4500:
-#             data_list.append(sample)
-#
-#     output_data = []
-#     for key in tqdm(data_list):
-#         project = data_list[key]
-#         unique_samples = []
-#         for i in range(len(project)):
-#             sample = project[i]['renamed_slice']
-#             sample = re.sub('\s|\t|\n','',sample)
-#             label = project[i]['label']
-#
-#             unique = True
-#             for j in range(len(unique_samples)):
-#                 sample_saved = unique_samples[j]['renamed_slice']
-#                 sample_saved = re.sub('\s|\t|\n', '', sample_saved)
-#                 label_saved = unique_samples[j]['label']
-#
-#                 similarity = difflib.SequenceMatcher(None, sample, sample_saved).quick_ratio()
-#                 if similarity > threshold and label == label_saved:
-#                     # print('#'*30 +'\n{v1}\n{v2}\n'.format(v1=project[i]['renamed_slice'], v2=unique_samples[j]['renamed_slice']))
-#                     unique = False
-#                     break
-#             if unique:
-#                 unique_samples.append(project[i])
-#
-#         output_data += unique_samples
-#         print('CVE_database_id: {v1}\traw_count: {v2}\tnow count: {v3}'.format(v1=str(key), v2=str(len(project)), v3=len(unique_samples)))
-#
-#     fp = open(out_path, 'w')
-#     output_data = json.dumps(output_data)
-#     fp.write(output_data)
-#     fp.close()
+def main(target_file, output_file, CWE):
+    if output_file == '':
+        output_file = target_file
+
+    json_data = read_json(target_file)
+
+    json_data = rename_input_vars(json_data)
+
+    if CWE == '89':
+        json_data = rename_all_var_and_str_89(json_data, isSARD=False)
+    elif CWE == '79':
+        json_data = rename_all_var_and_str_79(json_data, isSARD=False)
+    else:
+        raise ValueError("Invalid CWE")
+
+    json_data = edit_sample_id(json_data, isSARD=False)
+
+    json_data = remove_similar_slice(json_data,threshold=1)
+    json_data = check_syntax(json_data)
+
+    json_data = edit_sample_id(json_data)
+
+
+    write_json(json_data, output_file)
+
+
 
 
 
@@ -388,17 +374,4 @@ if __name__ == '__main__':
 
 
 
-    # json_data = rename_input_vars(json_data)
-    # json_data = rename_all_var_and_str_89(json_data, isSARD=False)
-    # json_data = edit_sample_id(json_data, isSARD=False)
-    # json_data = remove_similar_slice(json_data,threshold=1)
-    # json_data = edit_sample_id(json_data)
-    #
-    # write_json(json_data, OUT_PATH)
-    # json_data = edit_sample_id(json_data, isSARD=False)
-    # json_data = check_syntax(json_data)
-    write_json(json_data, SYNTHESIS_PATH)
-    # remove_similar_slice()
-    # edit_sample_id(OUT_UNIQUE_PATH)
-    # remove_similar_slice(SYNTHESIS_PATH, SYNTHESIS_PATH)
-    # gen_test_set(SYNTHESIS_PATH, TEST_PATH)
+

@@ -31,11 +31,15 @@ def main(model_name, base_model_path, output_model_path, crossvul_data_path, syn
             seq_cls
             causal LM
         train_mode:
-            random_real_data
-            unseen_real_data
-            unseen_real_data_without_slice
-            unseen_real_data_without_preprocess
+            random
+            unseen
+            random_without_slice
+            unseen_without_slice
+            random_without_preprocess
+            unseen_without_preprocess
         """
+    os.environ['TOKENIZERS_PARALLELISM'] = 'False'
+
     logger.info(f"[LLM] info: \n"
                 f"model_name: {model_name}\n"
                 f"train_task: {train_task}\n"
@@ -61,10 +65,10 @@ def main(model_name, base_model_path, output_model_path, crossvul_data_path, syn
     # fout = open(output_model_path + "log.txt", 'a+')
     # sys.stdout = fout
 
-    if 'random_real_data' in train_mode:
+    if 'random' in train_mode:
         # reduce train steps
         train_const.num_train_epochs = 2
-    elif 'unseen_real_data' in train_mode:
+    elif 'unseen' in train_mode:
         train_const.num_train_epochs = 3
     if CWE == '89':
         train_const.num_train_epochs += 1
@@ -107,28 +111,24 @@ def main(model_name, base_model_path, output_model_path, crossvul_data_path, syn
 
 def get_pathinfo(model_name, train_mode, train_task, CWE):
     if model_name == 'codellama-7b':
-        base_model_path = LLM_ENV_PATH + 'codellama-instruct-13b/models/7b/'
         output_model_path = MODEL_PATH + '/codellama-7b/' + train_mode + '_' + train_task + '_' + CWE + '/'
 
     elif model_name == 'codet5p-770m':
-        base_model_path = LLM_ENV_PATH + 'codeT5/codet5p-770m/'
         output_model_path = MODEL_PATH + '/codet5p-770m/' + train_mode + '_' + train_task + '_' + CWE + '/'
 
     elif model_name == 'codet5-base':
-        base_model_path = LLM_ENV_PATH + 'codeT5/codet5-base/'
         output_model_path = MODEL_PATH + '/codet5-base/' + train_mode + '_' + train_task + '_' + CWE + '/'
 
     elif model_name == 'starcoder2-3b':
-        base_model_path = LLM_ENV_PATH + 'starcoder2/starcoder2-3b/'
         output_model_path = MODEL_PATH + '/starcoder2-3b/' + train_mode + '_' + train_task + '_' + CWE + '/'
 
     elif model_name == 'starcoder2-7b':
-        base_model_path = LLM_ENV_PATH + 'starcoder2/starcoder2-7b/'
         output_model_path = MODEL_PATH + '/starcoder2-7b/' + train_mode + '_' + train_task + '_' + CWE + '/'
     else:
         exit()
 
-    return base_model_path, output_model_path
+
+    return output_model_path
 
 
 
@@ -141,15 +141,15 @@ if __name__ == '__main__':
             seq_cls
             causal LM
         train_mode:
-            random_real_data
-            unseen_real_data
-            random_real_data_without_slice
-            unseen_real_data_without_slice
-            random_real_data_without_preprocess
-            unseen_real_data_without_preprocess
+            random
+            unseen
+            random_without_slice
+            unseen_without_slice
+            random_without_preprocess
+            unseen_without_preprocess
         """
 
-    # train_mode = 'unseen_real_data'
+    # train_mode = 'unseen'
     # train_task = 'seq_cls'
     # CWE = '89'
     # # checkpoint = ""
@@ -161,7 +161,6 @@ if __name__ == '__main__':
     # model_name = 'codet5p-770m'
     #
     # # params process
-    # SARD_data_path = DATA_PATH + '/SARD_php_vulnerability_'+CWE+'.json'
     # crossvul_data_path = DATA_PATH + '/dataset_unique_'+CWE+'.json'
     # synthesis_data_path = DATA_PATH + '/dataset_synthesis_'+CWE+'.json'
     #
@@ -189,14 +188,13 @@ if __name__ == '__main__':
     train_task = 'seq_cls'
 
     # params process
-    SARD_data_path = DATA_PATH + '/SARD_php_vulnerability_' + CWE + '.json'
     crossvul_data_path = DATA_PATH + '/dataset_unique_' + CWE + '.json'
     synthesis_data_path = DATA_PATH + '/dataset_synthesis_' + CWE + '.json'
 
     # crossvul_data_path = DATA_PATH + '/samples_by_fix_' + CWE + '.json'
 
 
-    train_mode = 'unseen_real_data'
+    train_mode = 'unseen'
 
     # define
     model_name = 'codellama-7b'
@@ -205,7 +203,13 @@ if __name__ == '__main__':
     # model_name = 'codet5p-770m'
     # model_name = 'codet5-base'
 
-    base_model_path, output_model_path = get_pathinfo(model_name, train_mode, train_task, CWE)
+    base_model_path = LLM_ENV_PATH + 'codellama-instruct-13b/models/7b/'
+    # base_model_path = LLM_ENV_PATH + 'codeT5/codet5p-770m/'
+    # base_model_path = LLM_ENV_PATH + 'codeT5/codet5-base/'
+    # base_model_path = LLM_ENV_PATH + 'starcoder2/starcoder2-3b/'
+    # base_model_path = LLM_ENV_PATH + 'starcoder2/starcoder2-7b/'
+
+    output_model_path = get_pathinfo(model_name, train_mode, train_task, CWE)
 
     main(model_name,
          base_model_path,
@@ -218,7 +222,7 @@ if __name__ == '__main__':
          train=False
          )
 
-    train_mode = 'unseen_real_data'
+    train_mode = 'unseen'
 
     # define
     # model_name = 'codellama-7b'
@@ -240,7 +244,7 @@ if __name__ == '__main__':
          train=False
          )
 
-    train_mode = 'unseen_real_data'
+    train_mode = 'unseen'
 
     # define
     # model_name = 'codellama-7b'
@@ -262,7 +266,7 @@ if __name__ == '__main__':
          train=False
          )
 
-    train_mode = 'unseen_real_data'
+    train_mode = 'unseen'
 
     # define
     # model_name = 'codellama-7b'
@@ -284,7 +288,7 @@ if __name__ == '__main__':
          train=False
          )
 
-    train_mode = 'unseen_real_data'
+    train_mode = 'unseen'
 
     # define
     # model_name = 'codellama-7b'

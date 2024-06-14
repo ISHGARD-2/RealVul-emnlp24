@@ -102,12 +102,12 @@ def get_crossvul_data(train_const,
         seq_cls
         causal LM
     train_mode:
-        random_real_data
-        unseen_real_data
-        random_real_data_without_slice
-        unseen_real_data_without_slice
-        random_real_data_without_preprocess
-        unseen_real_data_without_preprocess
+        random
+        unseen
+        random_without_slice
+        unseen_without_slice
+        random_without_preprocess
+        unseen_without_preprocess
     """
 
     crossvul_data = read_json(crossvul_path)
@@ -126,17 +126,17 @@ def get_crossvul_data(train_const,
     if CWE == '79':
         project_data = analy_metadata([CWE])
     elif CWE == '89':
-        if train_mode == 'unseen_real_data_without_slice':
+        if train_mode == 'unseen_without_slice':
             project_data = analy_metadata([CWE])
         else:
             project_data = analy_metadata([CWE, '79'])
 
-    if train_mode == 'random_real_data' or train_mode == 'random_real_data_without_preprocess':
+    if train_mode == 'random' or train_mode == 'random_without_preprocess':
         test_data = crossvul_data
 
         train_data, eval_data = train_test_split(synthesis_data, test_size=rate, random_state=1)
 
-    elif train_mode == 'unseen_real_data' or train_mode == 'unseen_real_data_without_preprocess':
+    elif train_mode == 'unseen' or train_mode == 'unseen_without_preprocess':
         train_data, eval_data, test_data = [], [], []
 
         if CWE == '79':
@@ -190,7 +190,7 @@ def get_crossvul_data(train_const,
                         train_data.append(sample)
                 break
 
-    elif train_mode == 'random_real_data_without_slice':
+    elif train_mode == 'random_without_slice':
         for i, sample in enumerate(crossvul_data):
             crossvul_data[i]['func'] = get_code(sample['func'], tokenizer, train_const)
 
@@ -200,7 +200,7 @@ def get_crossvul_data(train_const,
         if CWE == '89':
             eval_data, test_data = train_data[:int(len(train_data)*0.1)], eval_data+test_data
 
-    elif train_mode == 'unseen_real_data_without_slice':
+    elif train_mode == 'unseen_without_slice':
         for i, sample in enumerate(crossvul_data):
             crossvul_data[i]['func'] = get_code(sample['func'], tokenizer, train_const)
 
