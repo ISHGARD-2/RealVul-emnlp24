@@ -1,3 +1,10 @@
 # ignore dir
 result/*
-data/*
+data/c*
+data/C*
+data/s*
+data/S*
+data/D*
+data/f*
+data/t*
+data/D*
