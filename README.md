@@ -43,8 +43,8 @@ gdown https://drive.google.com/file/d/1-PKETn0EvTkTrJCF4ZkcOHkviIUi6aLo/
 main.py 
     --task Sampling
     --cwe 79
-    --sampling_target_dir ./data/crossvul/xss/
-    --sampling_output_dir ./result/snippet/
+    --sampling_target_dir data/crossvul/xss/
+    --sampling_output_dir result/snippet/
 ```
 
 ### Preprocessing with labeled samples:
@@ -52,8 +52,8 @@ main.py
 main.py 
     --task Preprocessing
     --cwe 79
-    --prep_target_file ./result/CVI_10001_dataset.json
-    --prep_output_file ./result/dataset_unique_79.json
+    --prep_target_file result/CVI_10001_dataset.json
+    --prep_output_file result/dataset_unique_79.json
 ```
 
 
@@ -62,9 +62,9 @@ main.py
 main.py 
     --task Synthesis
     --cwe 79
-    --sard_samples_file ./data/SARD_php_vulnerability_79.json
-    --crossvul_samples_file ./data/dataset_unique_79.json
-    --synthesis_target_dir ./data/crossvul/xss/
+    --sard_samples_file data/SARD_php_vulnerability_79.json
+    --crossvul_samples_file data/dataset_unique_79.json
+    --synthesis_target_dir data/crossvul/xss/
 ```
 
 ## Start Fine-tuning
@@ -81,11 +81,11 @@ For train mode, we support:
 main.py 
     --task Training
     --cwe 79
-    --crossvul_dataset ./data/dataset_unique_79.json
-    --synthesis_dataset ./data/dataset_synthesis_79.json
+    --crossvul_dataset data/dataset_unique_79.json
+    --synthesis_dataset data/dataset_synthesis_79.json
     --train_mode random
     --base_model codellama-7b
-    --base_model_dir ./models/base_model/codellama-7b/
+    --base_model_dir models/base_model/codellama-7b/
 ```
 
 ### Eval:
@@ -94,10 +94,10 @@ main.py
 main.py 
     --task Evaluation
     --cwe 79
-    --crossvul_dataset ./data/dataset_unique_79.json
-    --synthesis_dataset ./data/dataset_synthesis_79.json
+    --crossvul_dataset data/dataset_unique_79.json
+    --synthesis_dataset data/dataset_synthesis_79.json
     --train_mode random
     --base_model codellama-7b
-    --base_model_dir ./models/base_model/codellama-7b/
+    --base_model_dir models/base_model/codellama-7b/
 ```
 ```

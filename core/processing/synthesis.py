@@ -12,7 +12,9 @@ from tqdm import tqdm
 
 from configs.const import SYNTHESIS_LEN, INPUT_VARIABLES
 from configs.settings import DATA_PATH, TMP_PATH, RESULT_PATH
-from core import args_prepare, FuncCall, scan
+from core.sampling.func_call import FuncCall
+from core.sampling.engine import scan
+
 from core.sampling.slicing import get_slice_from_flow
 from core.processing.sample_preprocess import rename_all_var_and_str_89, rename_all_var_and_str_79
 from utils.file import Directory, clear_slice

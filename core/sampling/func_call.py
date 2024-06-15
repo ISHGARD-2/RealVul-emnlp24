@@ -103,6 +103,7 @@ class FileInfo:
 
     def __file_process(self):
         path = os.path.join(self.target_directory, self.file_path)
+        # print(path, self.target_directory, self.file_path)
         file = codecs.open(str(path), "r", encoding='utf-8', errors='ignore')
 
         # code format change
@@ -214,7 +215,7 @@ class FuncCall:
 
     def __fileinfo_save(self, f_list):
         for file in f_list:
-            if file.startswith('\\'):
+            if file.startswith('\\') or file.startswith('/'):
                 file = file[1:]
             fi = FileInfo(file, self.target_directory)
 

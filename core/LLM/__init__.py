@@ -23,7 +23,7 @@ LOAD_CLASS = {
 
 
 def main(model_name, base_model_path, output_model_path, crossvul_data_path, synthesis_data_path,
-         train_task, train_mode, checkpoint='', train=True):
+         train_task, train_mode, CWE, checkpoint='', train=True):
     """
         CWE:
             79, 89

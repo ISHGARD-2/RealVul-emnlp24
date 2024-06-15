@@ -239,15 +239,12 @@ def get_crossvul_data(train_const,
         raise Exception
 
 
-    logger.info("[LLM] Dataset info: \ntrainset: {train}({train_vul_rate:.2%})\n"
-                "evalset: {val}({val_vul_rate:.2%})\n"
-                "testset: {test}({test_vul_rate:.2%})\n".format(
+    logger.info("[LLM] Dataset info: \ntrainset: {train}\n"
+                "evalset: {val}\n"
+                "testset: {test}\n".format(
         train=len(train_data),
-        train_vul_rate=sum(data['label'] == "bad" for data in train_data) / len(train_data),
         val=len(eval_data),
-        val_vul_rate=sum(data['label'] == "bad" for data in eval_data) / len(eval_data),
-        test=len(test_data),
-        test_vul_rate=sum(data['label'] == "bad" for data in test_data) / len(test_data)
+        test=len(test_data)
     ))
 
     shuffle(train_data)

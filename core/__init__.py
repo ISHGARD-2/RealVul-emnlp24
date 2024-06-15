@@ -89,7 +89,7 @@ def sampling(args):
 
     # parse target mode
     pa = ParseArgs(target_path, "csv", "", rule)
-    target_mode = pa.target_mode()
+    target_mode = pa.target_mode
 
     # target directory
     target_directory = pa.target_directory(target_mode)
@@ -116,8 +116,6 @@ def preprocessing(args):
 
     if args.prep_target_file == '' or not os.path.isfile(target_file):
         raise ValueError("Unknown preprocessing target json file")
-    if args.prep_output_file != '' and not os.path.isfile(output_file):
-        raise ValueError("Unknown preprocessing output json file")
 
     CWE = args.cwe
 
@@ -164,6 +162,7 @@ def finetune(args):
              synthesis_data_path,
              train_task,
              train_mode,
+             CWE,
              checkpoint='',
              train=need_train
              )

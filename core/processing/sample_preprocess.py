@@ -344,7 +344,7 @@ if __name__ == '__main__':
     CWE = '79'
 
     #path
-    RAW_PATH = DATA_PATH + '\\' + rule + '\\CVI_10002_dataset.json'
+    RAW_PATH = DATA_PATH + '\\' + rule + '\\CVI_10001_dataset.json'
     SARD_PATH_89 = DATA_PATH + '\\SARD_php_vulnerability_89.json'
 
     OUT_PATH = DATA_PATH + '\\' + rule + '\\CVI_10002_dataset_out.json'
