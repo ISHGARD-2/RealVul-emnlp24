@@ -28,5 +28,5 @@ MAX_FILE_LENGTH = 30000
 
 
 # LLM PATH
-LLM_ENV_PATH = "/home/dcao/code/Python/LLM/CodeLlama/"
+LLM_ENV_PATH = ""
 
