@@ -2,7 +2,7 @@
 import re
 
 from configs.const import REGEX
-from utils.my_utils import match_pair, match_params
+from utils.my_utils import match_pair, match_params, match_str
 
 
 class CVI_10001():
@@ -56,11 +56,43 @@ class CVI_10001():
             match_code = tmp_code[lp:rp]
             output_code = output_code.replace(match_code, "_PAD_")
 
-        if not output_code.strip().endswith(';'):
-            output_code += ';'
+        if output_code.strip().endswith(';'):
+            output_code = output_code.strip()[:-1]
+
+        index=0
+        while index < len(output_code):
+            while index < len(output_code) and output_code[index] not in ['\"', '\'']:
+                index += 1
+
+            if index >= len(output_code):
+                break
+
+            match_char = output_code[index]
+
+            pair = match_pair(output_code[index:], match_char, match_char, instr=True)
+            if pair is None:
+                output_code += match_char
+                break
+            else:
+                endpos = pair[1]
+                index += endpos + 1
+
+
+                lstr = output_code[:index]
+                rstr = output_code[index+1:]
+
+        output_code += ';'
         return output_code
 
     def complete_slice_end(self, vul_slice, code, para):
+        # get sink stmt
+        startpos = vul_slice.find(code)
+        if not startpos:
+            return None
+
+        endpos = match_str(vul_slice[startpos:], ';') + startpos
+        code = vul_slice[startpos:endpos]
+
         tmp_code = self.get_content(code, para['name'])
         if para['name'] not in tmp_code:
             return None
@@ -81,3 +113,9 @@ class CVI_10001():
                 output += code + s
 
         return output
+
+
+
+
+if __name__ == '__main__':
+    cvi = CVI_10001()

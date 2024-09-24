@@ -6,6 +6,7 @@ import traceback
 
 from phply.phplex import lexer
 from phply.phpparse import make_parser
+from tqdm import tqdm
 
 from utils.func_json import write_json
 from utils.my_utils import match_params
@@ -121,7 +122,7 @@ class SingleRule(object):
             logger.debug('[CVI-{cvi}] [ORIGIN] NOT FOUND!'.format(cvi=self.sr.svid))
             return None
 
-        for index, origin_vulnerability in enumerate(origin_vulnerabilities):
+        for index, origin_vulnerability in enumerate(tqdm(origin_vulnerabilities)):
             if origin_vulnerability == ():
                 logger.debug(' > continue...')
                 continue

@@ -39,6 +39,7 @@ class Slicing:
         # input
         self.params = params
         self.func_call = func_call
+        self.func = None
         self.target_directory = target_directory
         self.file_path = file_path
         self.code_content = code_content
@@ -58,7 +59,7 @@ class Slicing:
         if not func:
             return None
 
-
+        self.func = func
         slice = self.slice_func(func, mode)
 
         if slice is None or self.code_content not in slice:

@@ -151,12 +151,12 @@ def slilce_check_syntax(code, log=True):
 
     except SyntaxError as e:
         if log:
-            logger.warning('[UTILS] slice syntax error\n')
+            logger.debug('[UTILS] slice syntax error\n')
         return False
 
     except:
         if log:
-            logger.warning('[UTILS] slice error\n')
+            logger.debug('[UTILS] slice error\n')
         return False
     return True
 

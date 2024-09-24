@@ -41,7 +41,7 @@ class TrainConst:
         self.group_by_length = True
 
         # Log every X updates steps
-        self.logging_steps = 20
+        self.logging_steps = 10
 
         # evaluate model after n steps
         self.eval_steps = 200

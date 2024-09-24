@@ -197,7 +197,7 @@ def main():
     try:
         # arg parse
         # log
-        log(logging.DEBUG)
+        log(logging.INFO)
         logger.debug('[INIT] set logging level: {}'.format(logging.getLogger().level))
 
         # args

@@ -112,17 +112,17 @@ def sampling_by_fix(target_directory):
 if __name__ == '__main__':
     log(logging.DEBUG)
 
-    corssvul_data_path_79 = DATA_PATH + "/dataset_unique_79.json"
+    #corssvul_data_path_79 = DATA_PATH + "/dataset_unique_79.json"
     corssvul_data_path_89 = DATA_PATH + "/dataset_unique_89.json"
 
-    xss_target_directory = DATA_PATH + '/crossvul/xss/'
-    xss_write_path = DATA_PATH + '/samples_by_fix_79.json'
+    #xss_target_directory = DATA_PATH + '/crossvul/xss/'
+    #xss_write_path = DATA_PATH + '/samples_by_fix_79.json'
 
     sqli_target_directory = DATA_PATH + '/crossvul/sqli/'
     sqli_write_path = DATA_PATH + '/samples_by_fix_89.json'
 
-    samples = sampling_by_fix(xss_target_directory)
-    write_json(samples, xss_write_path)
+    # samples = sampling_by_fix(xss_target_directory)
+    # write_json(samples, xss_write_path)
 
     samples = sampling_by_fix(sqli_target_directory)
     write_json(samples, sqli_write_path)
