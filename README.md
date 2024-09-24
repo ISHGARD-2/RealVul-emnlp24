@@ -1,10 +1,23 @@
 # RealVul: PHP Vulnerability Detection based on LLMs
 
 ## Overview
-This repository contains the code for our prototype implementation of RealVul. RealVul is a LLM-based framework signed for PHP vulnerability detection on CWE-79 (XSS) and CWE-89 (SQL Injection). 
+This repository contains the code for our prototype implementation of RealVul, accepted by EMNLP 2024. RealVul is a LLM-based framework signed for PHP vulnerability detection on CWE-79 (XSS) and CWE-89 (SQL Injection). 
 
 
 ## Getting Started
+
+### Directory Structure
+
+ - `./configs`: Parameter settings for processing and fine-tuning.
+ - `./core`
+   - `/sampling`: Python scripts for the section of Candidate Vulnerability Detection.
+   - `/processing`: Python scripts for the section of Preprocessing. 
+   - `/LLM`: Python scripts for fine-tuning and evaluation.
+ - `./data`: Datasets used in our experiments.
+ - `./rule`
+   - `/php`: Vulnerability detection rules of XSS and SQLI. 
+ - `./utils`: Customized functions.
+
 
 ### Environment Setup
 install the python dependencies via the following command:
@@ -16,7 +29,7 @@ pip install -r requirements.txt
 ### Pre-trained LLM Download
 
 #### Code LLM Models
-We use 5 different Code LLMs as base model for fine-tuning. In this repository, we use CodeLlama-7B model as an example to reproduce the main results from the paper. This is how to obtain this pre-trained model:
+We use 7 different Code LLMs as base model for fine-tuning. In this repository, we use CodeLlama-7B model as an example to reproduce the main results from the paper. This is how to obtain this pre-trained model:
 
    - Make sure you have git-lfs installed. If not, run the command: 
    ```
